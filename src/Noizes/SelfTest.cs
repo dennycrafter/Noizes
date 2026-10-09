@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Reflection;
+using System.Text.Json.Nodes;
 using NAudio.Wave;
 
 namespace Noizes;
@@ -259,7 +260,13 @@ public static class SelfTest
             Check("setup-runner", exit == 0 && on.SequenceEqual(expected) && coreAt40 && hooks,
                 $"exit={exit} enabled=[{string.Join(",", on)}]");
 
-            // run twice: still exactly the four core events, hooks not duplicated
+            // run twice: idempotent end to end - hooks keep exactly one entry per hook
+            // (no duplicates, no new backups), exactly the four core events are on at 40,
+            // and the second saved config is semantically identical to the first's
+            // (parsed JSON, not bytes)
+            var configAfterRun1 = File.ReadAllText(configPath);
+            var backupsAfterRun1 = Directory.GetFiles(dir, "*.noizes-backup-*").Length;
+
             var exit2 = SetupRunner.Run(new SetupRunner.Options
             {
                 ClaudePath = claudePath,
@@ -268,9 +275,33 @@ public static class SelfTest
             });
             var cfg2 = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
             var on2 = cfg2 == null ? new List<string>() : EnabledIds(cfg2);
-            var occurrences = File.ReadAllText(claudePath).Split("claude-code-done").Length - 1;
-            Check("setup-runner-idempotent", exit2 == 0 && on2.SequenceEqual(expected) && occurrences == 1,
-                $"exit={exit2} occurrences={occurrences}");
+
+            // the unique event URLs are the hook entries - each must appear exactly once
+            var claudeText = File.ReadAllText(claudePath);
+            var cursorText = File.ReadAllText(cursorPath);
+            var occClaudeDone = claudeText.Split("/event/claude-code-done").Length - 1;
+            var occClaudeInput = claudeText.Split("/event/claude-code-input").Length - 1;
+            var occCursorDone = cursorText.Split("/event/cursor-done").Length - 1;
+
+            var coreOnAt40 = cfg2 != null && SetupRunner.CoreEvents
+                .All(id => cfg2.Events[id].Enabled && cfg2.Events[id].Volume == 40);
+            var restUntouched = cfg2 != null && cfg2.Events
+                .Where(kv => !SetupRunner.CoreEvents.Contains(kv.Key))
+                .All(kv => !kv.Value.Enabled && kv.Value.Volume == 40);
+
+            var node1 = JsonNode.Parse(configAfterRun1);
+            var node2 = JsonNode.Parse(File.ReadAllText(configPath));
+            var sameConfig = node1 != null && node2 != null && JsonNode.DeepEquals(node1, node2);
+
+            // a second run must not touch the hook files again ("already" short-circuits
+            // before the backup step), so no backup can appear between the runs
+            var noNewBackups = Directory.GetFiles(dir, "*.noizes-backup-*").Length == backupsAfterRun1;
+
+            Check("setup-idempotent", exit2 == 0 && on2.SequenceEqual(expected)
+                    && occClaudeDone == 1 && occClaudeInput == 1 && occCursorDone == 1
+                    && coreOnAt40 && restUntouched && sameConfig && noNewBackups,
+                $"exit={exit2} claude={occClaudeDone}/{occClaudeInput} cursor={occCursorDone} " +
+                $"sameConfig={sameConfig} enabled=[{string.Join(",", on2)}]");
         }
         catch (Exception ex) { Check("setup-runner", false, ex.Message); }
 
