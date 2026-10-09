@@ -58,7 +58,7 @@ public class TrayApplicationContext : ApplicationContext
                 $"Port {AppConfig.Current.Port} is busy, so integrations can't reach Noizes. " +
                 "Another program may be using it - change the port in Settings.", ToolTipIcon.Warning);
         _gh.Start();
-        _watcher.Start();
+        if (AppConfig.Current.Features.ClaudeDesktopWatcher) _watcher.Start(); // opt-in
         _deploy.Start();
         _uptime.Start();
         _countdown.Start();
@@ -74,7 +74,7 @@ public class TrayApplicationContext : ApplicationContext
             _form.Activate();
             return;
         }
-        _form = new SettingsForm { Server = _server, GitHub = _gh, FirstRun = firstRun };
+        _form = new SettingsForm { Server = _server, GitHub = _gh, Watcher = _watcher, FirstRun = firstRun };
         _form.Show();
     }
 
