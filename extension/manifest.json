@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Noizes Companion",
+  "version": "1.0.0",
+  "description": "Plays your Noizes sounds when claude.ai, Obvious or watched tabs finish, and when downloads complete.",
+  "permissions": [
+    "downloads",
+    "contextMenus",
+    "scripting",
+    "storage",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:7351/*",
+    "http://localhost:7351/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Noizes: Watch this tab"
+  },
+  "content_scripts": [
+    {
+      "js": ["claude-watcher.js"],
+      "matches": ["https://claude.ai/*"],
+      "run_at": "document_idle"
+    },
+    {
+      "js": ["obvious-watcher.js"],
+      "matches": ["https://app.obvious.ai/*", "https://obvious.ai/*"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -10,6 +10,7 @@ public class TrayApplicationContext : ApplicationContext
     SettingsForm _form;
     readonly HttpServer _server = new();
     readonly GitHubPoller _gh = new();
+    readonly ClaudeDesktopWatcher _watcher = new();
 
     public TrayApplicationContext(bool startWithUi)
     {
@@ -50,6 +51,7 @@ public class TrayApplicationContext : ApplicationContext
 
         _server.Start(AppConfig.Current.Port);
         _gh.Start();
+        _watcher.Start();
 
         if (startWithUi) ShowSettings();
     }
@@ -74,6 +76,7 @@ public class TrayApplicationContext : ApplicationContext
             _tray.Dispose();
             _server.Stop();
             _gh.Stop();
+            _watcher.Stop();
         }
         catch { }
         Application.Exit();
