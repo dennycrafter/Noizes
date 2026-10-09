@@ -1,5 +1,6 @@
-# Noizes long-command helper.
-# Usage:  noizes run <command...>     (plays a sound if the command took > 30 seconds)
+# Noizes helper.
+# Usage:  noizes setup                (one-command setup: hooks + the four core events; safe to run twice)
+#         noizes run <command...>     (plays a sound if the command took > 30 seconds)
 #         noizes test [eventId]       (plays a sound now; defaults to long-command-done)
 $ErrorActionPreference = 'Continue'
 $apiPort = 7351
@@ -19,9 +20,28 @@ function Send-Event([string]$id) {
 }
 
 if ($args.Count -eq 0) {
-    Write-Host "Usage: noizes run <command...>   (sound when the command takes over 30 seconds)"
-    Write-Host "       noizes test [eventId]     (play an event's sound now)"
+    Write-Host "Usage: noizes setup                  (wire Claude Code + Cursor hooks and turn on the core events)"
+    Write-Host "       noizes run <command...>       (sound when the command takes over 30 seconds)"
+    Write-Host "       noizes test [eventId]         (play an event's sound now)"
     exit 2
+}
+
+if ($args[0] -eq 'setup') {
+    # installed layout: run.ps1 sits next to Noizes.exe in {app}; repo layouts differ
+    $exe = $null
+    foreach ($cand in @(
+        (Join-Path $PSScriptRoot 'Noizes.exe'),
+        (Join-Path $PSScriptRoot '..\Noizes.exe'),
+        (Join-Path $PSScriptRoot '..\publish\Noizes.exe'))) {
+        if (Test-Path $cand) { $exe = $cand; break }
+    }
+    if (-not $exe) {
+        Write-Host "[noizes] Noizes.exe not found (looked next to run.ps1 and in ..\ and ..\publish\)."
+        Write-Host "[noizes] Install Noizes, or publish first: dotnet publish src/Noizes/Noizes.csproj -c Release -o publish"
+        exit 1
+    }
+    & $exe --setup
+    exit $LASTEXITCODE
 }
 
 if ($args[0] -eq 'test') {
