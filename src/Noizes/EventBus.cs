@@ -8,13 +8,25 @@ public static class EventBus
     public static DispatchResult Dispatch(string eventId, string[] focusAppOverride = null)
     {
         var def = EventRegistry.Get(eventId);
-        if (def == null) return new DispatchResult(false, "unknown-event");
+        if (def == null)
+        {
+            Logger.Info($"event {eventId}: skipped (unknown-event)");
+            return new DispatchResult(false, "unknown-event");
+        }
 
         var cfg = AppConfig.Current;
         var ec = cfg.Events.TryGetValue(eventId, out var e) ? e : new EventConfig();
 
-        if (!ec.Enabled) return new DispatchResult(false, "disabled");
-        if (QuietHours.IsQuiet(cfg, eventId)) return new DispatchResult(false, "quiet-hours");
+        if (!ec.Enabled)
+        {
+            Logger.Info($"event {eventId}: skipped (disabled)");
+            return new DispatchResult(false, "disabled");
+        }
+        if (QuietHours.IsQuiet(cfg, eventId))
+        {
+            Logger.Info($"event {eventId}: skipped (quiet-hours)");
+            return new DispatchResult(false, "quiet-hours");
+        }
 
         if (cfg.OnlyWhenUnfocused)
         {
@@ -22,7 +34,10 @@ public static class EventBus
                 ? focusAppOverride
                 : (ec.FocusApps.Count > 0 ? ec.FocusApps.ToArray() : def.DefaultFocusApps);
             if (FocusCheck.IsFocused(apps))
+            {
+                Logger.Info($"event {eventId}: skipped (source-focused)");
                 return new DispatchResult(false, "source-focused");
+            }
         }
 
         var path = ec.SoundPath;
