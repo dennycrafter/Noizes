@@ -560,6 +560,37 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("features-default-off", false, ex.Message); }
 
+        // 7c. a duplicate trigger inside the dedup window must not be mislabeled sound-missing
+        try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            var captured = new List<string>();
+            Logger.Sink = captured.Add;
+            try
+            {
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                cfg.Events["claude-code-done"].Enabled = true;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+                EventBus.Dispatch("claude-code-done"); // first fire: played (file exists, harness has the sounds)
+                EventBus.Dispatch("claude-code-done"); // second fire: inside the 1.2 s dedup window
+
+                var dedup = captured.Count(l => l.Contains(": deduplicated ("));
+                var missing = captured.Count(l => l.Contains(": sound-missing ("));
+                Check("dedup-reason", dedup == 1 && missing == 0,
+                    dedup == 1 && missing == 0 ? "second fire explains itself as deduplicated"
+                        : "captured: " + string.Join(" | ", captured));
+            }
+            finally
+            {
+                Logger.Sink = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("dedup-reason", false, ex.Message); }
+
         // report
         var report = string.Join(Environment.NewLine, Lines) + Environment.NewLine +
                      $"SUMMARY: {Lines.Count - _fails} passed, {_fails} failed" + Environment.NewLine;

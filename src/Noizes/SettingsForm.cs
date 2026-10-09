@@ -492,7 +492,7 @@ public class SettingsForm : Form
         var path = ec.SoundPath;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             path = Path.Combine(AppConfig.SoundsDir, def.DefaultSound);
-        var played = AudioPlayer.Play(_currentEvent + "-test", path, ec.Volume);
+        var played = AudioPlayer.Play(_currentEvent + "-test", path, ec.Volume).Played;
         if (!played)
             MessageBox.Show(this, "Could not play that file. Pick an .mp3 or .wav file.", "Noizes",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);

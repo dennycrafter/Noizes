@@ -44,8 +44,8 @@ public static class EventBus
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             path = Path.Combine(AppConfig.SoundsDir, def.DefaultSound);
 
-        bool played = AudioPlayer.Play(eventId, path, ec.Volume);
-        Logger.Info($"event {eventId}: {(played ? "played" : "sound-missing")} ({path})");
-        return new DispatchResult(played, played ? "played" : "sound-missing");
+        var play = AudioPlayer.Play(eventId, path, ec.Volume);
+        Logger.Info($"event {eventId}: {play.Reason} ({path})");
+        return new DispatchResult(play.Played, play.Reason);
     }
 }
