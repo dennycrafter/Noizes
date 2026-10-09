@@ -12,6 +12,8 @@ public class TrayApplicationContext : ApplicationContext
     readonly GitHubPoller _gh = new();
     readonly ClaudeDesktopWatcher _watcher = new();
     readonly DeployPoller _deploy = new();
+    readonly UptimeChecker _uptime = new();
+    readonly CountdownChecker _countdown = new();
 
     public TrayApplicationContext(bool startWithUi)
     {
@@ -54,6 +56,8 @@ public class TrayApplicationContext : ApplicationContext
         _gh.Start();
         _watcher.Start();
         _deploy.Start();
+        _uptime.Start();
+        _countdown.Start();
 
         if (startWithUi) ShowSettings();
     }
@@ -80,6 +84,8 @@ public class TrayApplicationContext : ApplicationContext
             _gh.Stop();
             _watcher.Stop();
             _deploy.Stop();
+            _uptime.Stop();
+            _countdown.Stop();
         }
         catch { }
         Application.Exit();
