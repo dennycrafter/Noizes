@@ -44,6 +44,21 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("config-roundtrip", false, ex.Message); }
 
+        // 1b. fresh-install defaults: every event ships disabled at 40% volume
+        try
+        {
+            var cfg = new AppConfig();
+            AppConfig.EnsureDefaults(cfg);
+            var bad = new List<string>();
+            foreach (var def in EventRegistry.All)
+                if (!cfg.Events.TryGetValue(def.Id, out var ec) || ec.Enabled || ec.Volume != 40)
+                    bad.Add(def.Id);
+            Check("defaults-off",
+                bad.Count == 0 && cfg.Events.Count == EventRegistry.All.Length,
+                bad.Count == 0 ? $"events={cfg.Events.Count}" : "bad: " + string.Join(",", bad));
+        }
+        catch (Exception ex) { Check("defaults-off", false, ex.Message); }
+
         // 2. Claude Code hook merge (with an existing hook that must survive)
         try
         {
