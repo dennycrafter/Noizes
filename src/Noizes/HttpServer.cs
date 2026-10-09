@@ -15,13 +15,28 @@ public class HttpServer
     public int Port { get; private set; }
     public bool DryRun { get; set; }
 
+    /// <summary>False when the last Start could not bind (e.g. the port is already taken).</summary>
+    public bool IsListening { get; private set; }
+
     public void Start(int port)
     {
         Stop();
         Port = port;
+        IsListening = false;
         _cts = new CancellationTokenSource();
         _listener = new TcpListener(IPAddress.Loopback, port);
-        _listener.Start();
+        try
+        {
+            _listener.Start();
+        }
+        catch (SocketException ex)
+        {
+            // another program (or a hung copy of Noizes) owns the port — stay alive and say so
+            _listener = null;
+            Logger.Info($"http server NOT listening on port {port}: {ex.Message} (port already in use?)");
+            return;
+        }
+        IsListening = true;
         _ = AcceptLoop(_cts.Token);
         Logger.Info($"http server listening on http://127.0.0.1:{port}");
     }
@@ -35,6 +50,7 @@ public class HttpServer
         }
         catch { }
         _listener = null;
+        IsListening = false;
     }
 
     async Task AcceptLoop(CancellationToken ct)

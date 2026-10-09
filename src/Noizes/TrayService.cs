@@ -53,6 +53,10 @@ public class TrayApplicationContext : ApplicationContext
         _tray.DoubleClick += (s, e) => ShowSettings();
 
         _server.Start(AppConfig.Current.Port);
+        if (!_server.IsListening)
+            _tray.ShowBalloonTip(10000, "Noizes",
+                $"Port {AppConfig.Current.Port} is busy, so integrations can't reach Noizes. " +
+                "Another program may be using it - change the port in Settings.", ToolTipIcon.Warning);
         _gh.Start();
         _watcher.Start();
         _deploy.Start();

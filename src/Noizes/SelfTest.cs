@@ -166,8 +166,9 @@ public static class SelfTest
             Exception busy = null;
             try { victim.Start(blockerPort); }
             catch (Exception ex) { busy = ex; }
-            Check("http-port-busy", busy == null,
-                busy == null ? "bind on a busy port failed gracefully" : busy.GetType().Name + ": " + busy.Message);
+            Check("http-port-busy", busy == null && !victim.IsListening,
+                busy == null && !victim.IsListening ? "busy port handled, server not listening"
+                    : $"threw={busy?.GetType().Name} listening={victim.IsListening}");
 
             blocker.Stop();
         }
