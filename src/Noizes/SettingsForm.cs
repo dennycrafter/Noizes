@@ -10,7 +10,7 @@ public class SettingsForm : Form
     /// <summary>First launch with no config yet: open on the first tab (Integrations) with a one-line pointer.</summary>
     public bool FirstRun;
 
-    readonly TabControl _tabs;
+    public ClaudeDesktopWatcher Watcher; // live start/stop when the feature flag toggles
 
     // events tab
     readonly ListView _list = new();
@@ -33,14 +33,23 @@ public class SettingsForm : Form
     readonly TextBox _txtQuietStart = new() { Width = 60, MaxLength = 5 };
     readonly TextBox _txtQuietEnd = new() { Width = 60, MaxLength = 5 };
 
-    // connections tab
-    readonly Button _btnClaude = new() { Text = "Connect Claude Code" };
-    readonly Button _btnCursor = new() { Text = "Connect Cursor" };
+    // integrations tab (first tab — one obvious surface to turn things on and off)
+    readonly TabControl _tabs;
+    TabPage _integrationsPage, _extrasPage;
+    readonly Dictionary<string, Label> _integStatus = new();
+    readonly Button _btnClaude = new() { Text = "Set up" };
+    readonly Button _btnCursor = new() { Text = "Set up" };
+    readonly Button _btnGhReveal = new() { Text = "Add token…" };
+    readonly Button _btnWatcher = new() { Text = "Turn on" };
+    readonly Button _btnChromeHow = new() { Text = "How do I add it?" };
+    readonly Button _btnExtrasGo = new() { Text = "Configure…" };
+    GroupBox _ghPanel;
+    Font _boldFont;
     readonly TextBox _txtToken = new() { Width = 340, UseSystemPasswordChar = true };
     readonly TextBox _txtUser = new() { Width = 180 };
     readonly NumericUpDown _numPoll = new() { Minimum = 5, Maximum = 300, Value = 10, Width = 90 };
-    readonly Button _btnSaveGh = new() { Text = "Save GitHub settings" };
-    readonly Button _btnTestGh = new() { Text = "Test GitHub connection" };
+    readonly Button _btnSaveGh = new() { Text = "Save" };
+    readonly Button _btnTestGh = new() { Text = "Test" };
     readonly Label _lblGhStatus = new() { Text = "", AutoSize = true };
 
     // extras tab
@@ -63,10 +72,17 @@ public class SettingsForm : Form
         Font = new Font("Segoe UI", 9f);
 
         var tabs = _tabs = new TabControl { Dock = DockStyle.Fill };
+        _boldFont = new Font(Font, FontStyle.Bold);
+        Disposed += (s, e) => _boldFont.Dispose();
+
+        tabs.TabPages.Add(BuildIntegrationsTab());
         tabs.TabPages.Add(BuildEventsTab());
         tabs.TabPages.Add(BuildGeneralTab());
-        tabs.TabPages.Add(BuildConnectionsTab());
         tabs.TabPages.Add(BuildExtrasTab());
+        _tabs.SelectedIndexChanged += (s, e) =>
+        {
+            if (_tabs.SelectedTab == _integrationsPage) RefreshIntegrationStatuses(); // keep status text live
+        };
 
         var bottom = new FlowLayoutPanel
         {
@@ -80,7 +96,7 @@ public class SettingsForm : Form
         bottom.Controls.Add(btnClose);
         bottom.Controls.Add(btnSave);
 
-        Controls.Add(tabs);
+        Controls.Add(_tabs);
         Controls.Add(bottom);
 
         LoadAll();
@@ -182,73 +198,205 @@ public class SettingsForm : Form
         return page;
     }
 
-    TabPage BuildConnectionsTab()
+    TabPage BuildIntegrationsTab()
     {
-        var page = new TabPage("Connections");
+        var page = new TabPage("Integrations");
+        _integrationsPage = page;
 
         var panel = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            AutoSize = true, Padding = new Padding(12), WrapContents = false
+            AutoScroll = true, Padding = new Padding(12), WrapContents = false
         };
 
-        var g1 = new GroupBox { Text = "Coding agents", AutoSize = true, Width = 700, Padding = new Padding(10) };
-        var g1p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
-        g1p.Controls.Add(new Label
+        panel.Controls.Add(IntegrationRow("Claude Code",
+            "Adds the \"finished\" and \"needs your input\" hooks to ~/.claude/settings.json. Your file is backed up first and nothing already in it is removed. Open a NEW Claude Code session afterwards.",
+            "claude", _btnClaude));
+        panel.Controls.Add(IntegrationRow("Cursor",
+            "Adds an agent \"stop\" hook to ~/.cursor/hooks.json. Your file is backed up first and nothing already in it is removed. Restart Cursor afterwards.",
+            "cursor", _btnCursor));
+        panel.Controls.Add(IntegrationRow("GitHub activity",
+            "Sounds for pushes, PRs, failed checks, stars, issues and comments on your account. Your token stays on this computer and is only sent to api.github.com.",
+            "github", _btnGhReveal));
+        panel.Controls.Add(IntegrationRow("Claude desktop app",
+            "Watches the desktop app's Stop button and plays a sound when a response finishes. Off by default - nothing is watched until you turn it on.",
+            "watcher", _btnWatcher));
+        panel.Controls.Add(IntegrationRow("Chrome extension",
+            "Sounds for finished claude.ai and Obvious chats, watched tabs and downloads in Chrome. Loaded from chrome://extensions - no store needed.",
+            "chrome", _btnChromeHow));
+        panel.Controls.Add(IntegrationRow("Uptime watch, countdown & long commands",
+            "Uptime checks and the countdown are configured on the Uptime & countdown tab. Long commands play a sound when you run them through 'noizes run' in a terminal.",
+            "extras", _btnExtrasGo));
+
+        _btnClaude.Click += (s, e) => { ConnectClaude(); RefreshIntegrationStatuses(); };
+        _btnCursor.Click += (s, e) => { ConnectCursor(); RefreshIntegrationStatuses(); };
+        _btnGhReveal.Click += (s, e) => ToggleGitHubPanel();
+        _btnWatcher.Click += (s, e) => ToggleWatcher();
+        _btnChromeHow.Click += (s, e) => ShowChromeHowTo();
+        _btnExtrasGo.Click += (s, e) => _tabs.SelectedTab = _extrasPage;
+        _btnSaveGh.Click += (s, e) =>
         {
-            Text = "These buttons add Noizes hooks to the tools' own config files. The original file is backed up first\n(a .noizes-backup-... copy next to it) and nothing existing is ever removed.",
-            AutoSize = true, Width = 650
-        });
-        var row1 = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 650 };
-        row1.Controls.Add(_btnClaude);
-        g1p.Controls.Add(row1);
-        var row2 = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 650 };
-        row2.Controls.Add(_btnCursor);
-        g1p.Controls.Add(row2);
-        g1.Controls.Add(g1p);
-
-        var g2 = new GroupBox { Text = "GitHub", AutoSize = true, Width = 700, Padding = new Padding(10) };
-        var g2p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
-        g2p.Controls.Add(new Label
-        {
-            Text = "Paste a read-only personal access token (see README for how to make one). Noizes polls your account\nfor pushes, PRs, failed checks, stars, issues and comments, plus deployment statuses.",
-            AutoSize = true, Width = 650
-        });
-        var tokRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
-        tokRow.Controls.Add(new Label { Text = "Token:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        tokRow.Controls.Add(_txtToken);
-        g2p.Controls.Add(tokRow);
-        var userRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
-        userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        userRow.Controls.Add(_txtUser);
-        g2p.Controls.Add(userRow);
-        var pollRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
-        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        pollRow.Controls.Add(_numPoll);
-        pollRow.Controls.Add(new Label { Text = "seconds (5-300). Each check is lightweight: if nothing new, GitHub answers with an empty 304.", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        g2p.Controls.Add(pollRow);
-        var ghRow = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 650 };
-        ghRow.Controls.Add(_btnSaveGh);
-        ghRow.Controls.Add(_btnTestGh);
-        ghRow.Controls.Add(_lblGhStatus);
-        g2p.Controls.Add(ghRow);
-        g2.Controls.Add(g2p);
-
-        panel.Controls.Add(g1);
-        panel.Controls.Add(g2);
-        page.Controls.Add(panel);
-
-        _btnClaude.Click += (s, e) => ConnectClaude();
-        _btnCursor.Click += (s, e) => ConnectCursor();
-        _btnSaveGh.Click += (s, e) => { ApplyGitHub(); AppConfig.Save(); _lblGhStatus.Text = "Saved."; };
+            ApplyGitHub();
+            AppConfig.Save();
+            _lblGhStatus.Text = "Saved.";
+            RefreshIntegrationStatuses();
+        };
         _btnTestGh.Click += (s, e) => _ = TestGitHub();
 
+        page.Controls.Add(panel);
+        page.Controls.Add(BuildGitHubPanel());
+        RefreshIntegrationStatuses();
         return page;
+    }
+
+    Control IntegrationRow(string title, string description, string statusKey, Button action)
+    {
+        var row = new FlowLayoutPanel
+        {
+            AutoSize = true, Width = 712, WrapContents = false, Margin = new Padding(0, 4, 0, 8)
+        };
+
+        var nameCol = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown, AutoSize = true, Width = 424, WrapContents = false,
+            Margin = new Padding(0)
+        };
+        nameCol.Controls.Add(new Label
+        {
+            Text = title, AutoSize = true, Font = _boldFont, Margin = new Padding(3, 3, 3, 0)
+        });
+        nameCol.Controls.Add(new Label
+        {
+            Text = description, AutoSize = true, MaximumSize = new Size(414, 0),
+            ForeColor = Color.FromArgb(96, 96, 96), Margin = new Padding(3, 0, 3, 0)
+        });
+        row.Controls.Add(nameCol);
+
+        var status = new Label
+        {
+            AutoSize = false, Width = 132, TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(60, 60, 60), Margin = new Padding(8, 6, 8, 0)
+        };
+        _integStatus[statusKey] = status;
+        row.Controls.Add(status);
+        action.Margin = new Padding(8, 3, 3, 3);
+        row.Controls.Add(action);
+        return row;
+    }
+
+    Control BuildGitHubPanel()
+    {
+        _ghPanel = new GroupBox
+        {
+            Text = "GitHub settings", Dock = DockStyle.Bottom, Visible = false,
+            Padding = new Padding(10)
+        };
+        var p = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false
+        };
+
+        p.Controls.Add(new Label
+        {
+            Text = "Create a read-only token: github.com/settings/personal-access-tokens -> Generate new token -> fine-grained -> Public repositories (read-only), no extra permissions.",
+            AutoSize = true, MaximumSize = new Size(650, 0), ForeColor = Color.FromArgb(96, 96, 96)
+        });
+
+        var tokRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
+        tokRow.Controls.Add(new Label { Text = "Token:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        tokRow.Controls.Add(_txtToken);
+        p.Controls.Add(tokRow);
+
+        var userRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
+        userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        userRow.Controls.Add(_txtUser);
+        p.Controls.Add(userRow);
+
+        var pollRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
+        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        pollRow.Controls.Add(_numPoll);
+        pollRow.Controls.Add(new Label
+        {
+            Text = "seconds (5-300). Each check is lightweight: if nothing new, GitHub answers with an empty 304.",
+            AutoSize = true, Margin = new Padding(3, 9, 3, 0)
+        });
+        p.Controls.Add(pollRow);
+
+        var btnRow = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 660 };
+        btnRow.Controls.Add(_btnSaveGh);
+        btnRow.Controls.Add(_btnTestGh);
+        btnRow.Controls.Add(_lblGhStatus);
+        p.Controls.Add(btnRow);
+
+        _ghPanel.Controls.Add(p);
+        return _ghPanel;
+    }
+
+    void ToggleGitHubPanel()
+    {
+        _ghPanel.Visible = !_ghPanel.Visible;
+        _btnGhReveal.Text = _ghPanel.Visible ? "Hide" : HasGitHubToken() ? "Edit…" : "Add token…";
+    }
+
+    void ToggleWatcher()
+    {
+        AppConfig.Current.Features.ClaudeDesktopWatcher = !AppConfig.Current.Features.ClaudeDesktopWatcher;
+        ApplyWatcherFlag();
+        AppConfig.Save();
+        RefreshIntegrationStatuses();
+    }
+
+    void ApplyWatcherFlag()
+    {
+        if (Watcher == null) return;
+        if (AppConfig.Current.Features.ClaudeDesktopWatcher) Watcher.Start();
+        else Watcher.Stop();
+    }
+
+    void ShowChromeHowTo()
+    {
+        MessageBox.Show(this,
+            "1. Open chrome://extensions in Chrome.\n" +
+            "2. Turn on Developer mode (top right), then click Load unpacked.\n" +
+            "3. Select the extension folder from the Noizes repository (see README - Chrome extension).\n\n" +
+            "After that, browser events are just events: turn them on or off on the Events tab.",
+            "Add the Chrome extension", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    void RefreshIntegrationStatuses()
+    {
+        var c = AppConfig.Current;
+        _integStatus["claude"].Text = HookInstalled(ClaudeCodeConnector.SettingsPath, "event/claude-code-done")
+            ? "Connected" : "Not connected";
+        _integStatus["cursor"].Text = HookInstalled(CursorConnector.HooksPath, "event/cursor-done")
+            ? "Connected" : "Not connected";
+        _integStatus["github"].Text = HasGitHubToken()
+            ? "Watching every " + Math.Clamp(c.GitHub.PollSeconds, 5, 300) + " s" : "Off";
+        _integStatus["watcher"].Text = c.Features.ClaudeDesktopWatcher ? "Watching" : "Off";
+        _integStatus["chrome"].Text = "-";
+        _integStatus["extras"].Text = ExtrasStatus(c);
+        _btnWatcher.Text = c.Features.ClaudeDesktopWatcher ? "Turn off" : "Turn on";
+        if (!_ghPanel.Visible)
+            _btnGhReveal.Text = HasGitHubToken() ? "Edit…" : "Add token…";
+    }
+
+    static bool HookInstalled(string file, string marker) =>
+        File.Exists(file) && File.ReadAllText(file).Contains(marker, StringComparison.Ordinal);
+
+    static bool HasGitHubToken() => !string.IsNullOrWhiteSpace(AppConfig.Current.GitHub.Token);
+
+    static string ExtrasStatus(AppConfig c)
+    {
+        var on = (c.UptimeUrls.Count > 0 ? 1 : 0)
+                 + (c.Countdown.Enabled ? 1 : 0)
+                 + (c.Events.TryGetValue("long-command-done", out var lc) && lc.Enabled ? 1 : 0);
+        return on == 0 ? "Off" : $"On ({on} of 3)";
     }
 
     TabPage BuildExtrasTab()
     {
         var page = new TabPage("Uptime & countdown");
+        _extrasPage = page;
         var panel = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
@@ -455,6 +603,8 @@ public class SettingsForm : Form
         AppConfig.Save();
         if (Server != null && Server.Port != c.Port) Server.Start(c.Port);
         if (GitHub != null && GitHub.PollSeconds != c.GitHub.PollSeconds) GitHub.Restart();
+        ApplyWatcherFlag(); // keep the watcher matched to the flag after every save
+        RefreshIntegrationStatuses();
         MessageBox.Show(this, "Settings saved.", "Noizes", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
