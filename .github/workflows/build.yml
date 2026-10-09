@@ -1,0 +1,64 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'tier-*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build and self-test
+        shell: pwsh
+        run: |
+          dotnet build src/Noizes/Noizes.csproj -c Release
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru
+          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          exit $p.ExitCode
+
+      - name: Publish self-contained exe
+        run: dotnet publish src/Noizes/Noizes.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          case "$GITHUB_REF_NAME" in
+            tier-1) echo "version=0.1.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 1 - core (Claude Code hooks, Cursor hook, GitHub basics)" >> "$GITHUB_OUTPUT";;
+            tier-2) echo "version=0.2.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 2 - Claude desktop app watcher + Chrome extension" >> "$GITHUB_OUTPUT";;
+            tier-3) echo "version=0.3.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 3 - deploy statuses + GitHub stars/issues/comments" >> "$GITHUB_OUTPUT";;
+            *)      echo "version=1.0.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 4 - uptime watch, long-command, countdown (all features)" >> "$GITHUB_OUTPUT";;
+          esac
+
+      - name: Build installer
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=${{ steps.ver.outputs.version }} installer/noizes.iss'
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Noizes ${{ steps.ver.outputs.version }} - ${{ steps.ver.outputs.tier }}
+          body: |
+            Installer: download **Noizes-${{ steps.ver.outputs.version }}-setup.exe** below and run it.
+
+            This build is unsigned, so Windows SmartScreen will warn: click **More info**, then **Run anyway**.
+
+            Setup steps (hooks, Chrome extension, GitHub token) are in the README.
+          files: installer/Output/Noizes-*.exe
