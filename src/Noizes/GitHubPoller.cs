@@ -15,6 +15,9 @@ namespace Noizes;
 public class GitHubPoller
 {
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
+
+    /// <summary>Test seam: SelfTest supplies canned responses instead of hitting api.github.com (like Logger.Sink).</summary>
+    internal Func<HttpRequestMessage, HttpResponseMessage> TestHttp;
     string _etag;
     readonly HashSet<string> _seen = new();
     bool _primed;
@@ -45,6 +48,12 @@ public class GitHubPoller
         try { await Poll(); }
         catch (Exception ex) { Logger.Info("github poll error: " + ex.Message); }
     }
+
+    async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req)
+        => TestHttp != null ? TestHttp(req) : await Http.SendAsync(req);
+
+    /// <summary>Timer-free entry for tests: runs one full poll cycle against the (test) responder.</summary>
+    internal Task PollOnce() => Poll();
 
     async Task Poll()
     {

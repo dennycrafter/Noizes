@@ -14,7 +14,11 @@ public class GitHubConfig
 {
     public string Token { get; set; } = "";
     public string Username { get; set; } = "dennycrafter";
-    public int PollSeconds { get; set; } = 10; // seconds between user-events polls; clamped 5..300 at use
+    public int PollSeconds { get; set; } = 10; // seconds between polls; clamped 5..300 at use
+    // Repo feeds to watch in addition to the user feed, one "owner/repo" per entry.
+    // The user feed only ever contains the user's own actions, so events by other
+    // actors (GitHub Apps, collaborators) are only visible via /repos/{owner}/{repo}/events.
+    public List<string> Repos { get; set; } = new();
 }
 
 public class CountdownConfig
