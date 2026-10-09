@@ -63,10 +63,10 @@ public class TrayApplicationContext : ApplicationContext
         _uptime.Start();
         _countdown.Start();
 
-        if (startWithUi) ShowSettings();
+        if (startWithUi) ShowSettings(firstRun: true);
     }
 
-    void ShowSettings()
+    void ShowSettings(bool firstRun = false)
     {
         if (_form != null && !_form.IsDisposed)
         {
@@ -74,7 +74,7 @@ public class TrayApplicationContext : ApplicationContext
             _form.Activate();
             return;
         }
-        _form = new SettingsForm { Server = _server, GitHub = _gh };
+        _form = new SettingsForm { Server = _server, GitHub = _gh, FirstRun = firstRun };
         _form.Show();
     }
 

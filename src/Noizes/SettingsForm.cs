@@ -7,6 +7,10 @@ public class SettingsForm : Form
 {
     public HttpServer Server;
     public GitHubPoller GitHub;
+    /// <summary>First launch with no config yet: open on the first tab (Integrations) with a one-line pointer.</summary>
+    public bool FirstRun;
+
+    readonly TabControl _tabs;
 
     // events tab
     readonly ListView _list = new();
@@ -58,7 +62,7 @@ public class SettingsForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9f);
 
-        var tabs = new TabControl { Dock = DockStyle.Fill };
+        var tabs = _tabs = new TabControl { Dock = DockStyle.Fill };
         tabs.TabPages.Add(BuildEventsTab());
         tabs.TabPages.Add(BuildGeneralTab());
         tabs.TabPages.Add(BuildConnectionsTab());
@@ -458,5 +462,20 @@ public class SettingsForm : Form
     {
         ApplySelectedEvent(); // keep event edits even if Save was not clicked
         base.OnFormClosing(e);
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        if (!FirstRun || _tabs.TabPages.Count == 0) return;
+        _tabs.SelectedIndex = 0; // Integrations once it exists; today the first tab
+        var hint = new Label
+        {
+            Text = "Everything is off by default - connect an integration on this tab to hear your first sound.",
+            Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(10, 8, 0, 0)
+        };
+        _tabs.TabPages[0].Controls.Add(hint);
+        hint.BringToFront();
     }
 }

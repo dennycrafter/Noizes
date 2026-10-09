@@ -24,3 +24,13 @@ jobs:
           $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru
           if (Test-Path "selftest.log") { Get-Content "selftest.log" }
           exit $p.ExitCode
+
+      - name: Publish self-contained exe
+        run: dotnet publish src/Noizes/Noizes.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      # verifies installer/noizes.iss still compiles (the release build only runs on tags)
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=0.0.0-ci installer/noizes.iss

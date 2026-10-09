@@ -8,6 +8,9 @@ internal static class Program
         if (args.Any(a => a == "--selftest"))
             return SelfTest.Run();
 
+        if (args.Any(a => a == "--setup"))
+            return SetupRunner.Run(new SetupRunner.Options());
+
         bool createdNew;
         using var mutex = new System.Threading.Mutex(true, "Noizes.SingleInstance", out createdNew);
         if (!createdNew) return 0; // already running
