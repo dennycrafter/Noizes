@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 
 namespace Noizes;
 
@@ -147,7 +148,7 @@ public class HttpServer
     }
 
     static string JsonFor(string id, DispatchResult r) =>
-        $"{{\"ok\":true,\"event\":\"{id}\",\"played\":{(r.Played ? "true" : "false")},\"reason\":\"{r.Reason}\"}}";
+        $"{{\"ok\":true,\"event\":{JsonSerializer.Serialize(id ?? "")},\"played\":{(r.Played ? "true" : "false")},\"reason\":\"{r.Reason}\"}}";
 
     static async Task<string> ReadLine(NetworkStream s)
     {

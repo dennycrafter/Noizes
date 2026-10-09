@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using NAudio.Wave;
 
@@ -34,6 +35,22 @@ public static class SelfTest
         var p = ((IPEndPoint)l.LocalEndpoint).Port;
         l.Stop();
         return p;
+    }
+
+    static string RawRequest(int port, string raw)
+    {
+        using var c = new TcpClient();
+        c.Connect(IPAddress.Loopback, port);
+        var stream = c.GetStream();
+        stream.ReadTimeout = 3000;
+        var bytes = Encoding.UTF8.GetBytes(raw);
+        stream.Write(bytes, 0, bytes.Length);
+        var buf = new byte[8192];
+        var sb = new StringBuilder();
+        int n;
+        try { while ((n = stream.Read(buf, 0, buf.Length)) > 0) sb.Append(Encoding.UTF8.GetString(buf, 0, n)); }
+        catch { }
+        return sb.ToString();
     }
 
     public static int Run()
@@ -217,6 +234,30 @@ public static class SelfTest
             blocker.Stop();
         }
         catch (Exception ex) { Check("http-port-busy", false, ex.Message); }
+
+        // 5c. odd event ids: the JSON response body must stay valid JSON
+        try
+        {
+            var p = FreePort();
+            var rawSrv = new HttpServer { DryRun = true };
+            rawSrv.Start(p);
+
+            var respText = RawRequest(p, "GET /event/foo\"bar\\baz HTTP/1.1\r\nHost: x\r\n\r\n");
+            var body = respText.Substring(respText.IndexOf("\r\n\r\n") + 4);
+            var validJson = false;
+            var jerr = "";
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                validJson = doc.RootElement.GetProperty("event").GetString() == "foo\"bar\\baz";
+            }
+            catch (Exception jex) { jerr = jex.Message; }
+            Check("http-json-escaping", validJson,
+                validJson ? "404 body is valid JSON and round-trips the id" : "body: " + body + " (" + jerr + ")");
+
+            rawSrv.Stop();
+        }
+        catch (Exception ex) { Check("http-json-escaping", false, ex.Message); }
 
         // 6. quiet hours logic
         try
