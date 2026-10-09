@@ -40,7 +40,7 @@ const
   EnvironmentKey = 'Environment';
   WM_SETTINGCHANGE = $001A;
   SMTO_ABORTIFHUNG = $0002;
-  HWND_BROADCAST = $FFFF;
+  // HWND_BROADCAST ($FFFF) is predefined by Inno Setup's script engine - redeclaring it is a duplicate-identifier error
 
 procedure SendMessageTimeout(hWnd: HWND; Msg: UINT; wParam: WPARAM; lParam: LPARAM;
   fuFlags: UINT; uTimeout: UINT; var lpdwResult: DWORD);
