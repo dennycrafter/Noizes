@@ -70,7 +70,7 @@ public class TrayApplicationContext : ApplicationContext
             _form.Activate();
             return;
         }
-        _form = new SettingsForm { Server = _server };
+        _form = new SettingsForm { Server = _server, GitHub = _gh };
         _form.Show();
     }
 

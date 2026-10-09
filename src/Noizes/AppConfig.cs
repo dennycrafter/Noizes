@@ -14,6 +14,7 @@ public class GitHubConfig
 {
     public string Token { get; set; } = "";
     public string Username { get; set; } = "dennycrafter";
+    public int PollSeconds { get; set; } = 10; // seconds between user-events polls; clamped 5..300 at use
 }
 
 public class CountdownConfig

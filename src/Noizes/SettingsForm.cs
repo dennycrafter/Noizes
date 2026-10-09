@@ -6,6 +6,7 @@ namespace Noizes;
 public class SettingsForm : Form
 {
     public HttpServer Server;
+    public GitHubPoller GitHub;
 
     // events tab
     readonly ListView _list = new();
@@ -33,6 +34,7 @@ public class SettingsForm : Form
     readonly Button _btnCursor = new() { Text = "Connect Cursor" };
     readonly TextBox _txtToken = new() { Width = 340, UseSystemPasswordChar = true };
     readonly TextBox _txtUser = new() { Width = 180 };
+    readonly NumericUpDown _numPoll = new() { Minimum = 5, Maximum = 300, Value = 10, Width = 90 };
     readonly Button _btnSaveGh = new() { Text = "Save GitHub settings" };
     readonly Button _btnTestGh = new() { Text = "Test GitHub connection" };
     readonly Label _lblGhStatus = new() { Text = "", AutoSize = true };
@@ -205,7 +207,7 @@ public class SettingsForm : Form
         var g2p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
         g2p.Controls.Add(new Label
         {
-            Text = "Paste a read-only personal access token (see README for how to make one). Noizes polls your account\nevery 30 seconds for pushes, PRs, failed checks, stars, issues and comments, plus deployment statuses.",
+            Text = "Paste a read-only personal access token (see README for how to make one). Noizes polls your account\nfor pushes, PRs, failed checks, stars, issues and comments, plus deployment statuses.",
             AutoSize = true, Width = 650
         });
         var tokRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
@@ -216,6 +218,11 @@ public class SettingsForm : Form
         userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
         userRow.Controls.Add(_txtUser);
         g2p.Controls.Add(userRow);
+        var pollRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
+        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        pollRow.Controls.Add(_numPoll);
+        pollRow.Controls.Add(new Label { Text = "seconds (5-300). Each check is lightweight: if nothing new, GitHub answers with an empty 304.", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        g2p.Controls.Add(pollRow);
         var ghRow = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 650 };
         ghRow.Controls.Add(_btnSaveGh);
         ghRow.Controls.Add(_btnTestGh);
@@ -362,6 +369,7 @@ public class SettingsForm : Form
     {
         AppConfig.Current.GitHub.Token = _txtToken.Text.Trim();
         AppConfig.Current.GitHub.Username = _txtUser.Text.Trim();
+        AppConfig.Current.GitHub.PollSeconds = (int)_numPoll.Value;
     }
 
     async System.Threading.Tasks.Task TestGitHub()
@@ -413,6 +421,7 @@ public class SettingsForm : Form
         _chkAllowAlarms.Checked = c.Quiet.AllowAlarms;
         _txtToken.Text = c.GitHub.Token;
         _txtUser.Text = c.GitHub.Username;
+        _numPoll.Value = Math.Clamp(c.GitHub.PollSeconds, 5, 300);
         _txtUrls.Text = string.Join(Environment.NewLine, c.UptimeUrls);
         _chkCountdown.Checked = c.Countdown.Enabled;
         _dtp.Value = c.Countdown.TargetLocal;
@@ -441,6 +450,7 @@ public class SettingsForm : Form
         WindowsStartup.SetEnabled(c.StartWithWindows);
         AppConfig.Save();
         if (Server != null && Server.Port != c.Port) Server.Start(c.Port);
+        if (GitHub != null && GitHub.PollSeconds != c.GitHub.PollSeconds) GitHub.Restart();
         MessageBox.Show(this, "Settings saved.", "Noizes", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
