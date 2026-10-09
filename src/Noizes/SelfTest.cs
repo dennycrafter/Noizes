@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using NAudio.Wave;
 
@@ -203,6 +204,85 @@ public static class SelfTest
             }
         }
         catch (Exception ex) { Check("skip-logging", false, ex.Message); }
+
+        // 8. repo feeds: events by other actors (GitHub Apps, collaborators) must fire
+        try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            var cfg = new AppConfig();
+            AppConfig.EnsureDefaults(cfg);
+            cfg.GitHub.Token = "t";
+            cfg.GitHub.Username = "dennycrafter";
+            cfg.GitHub.Repos.Add("dennycrafter/Noizes");
+            cfg.GitHub.Repos.Add("not-a-repo"); // invalid entries must never reach the API
+            prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+            static string Ev(string id, string actor) =>
+                "{\"id\":\"" + id + "\",\"type\":\"PushEvent\",\"actor\":{\"login\":\"" + actor +
+                "\"},\"repo\":{\"name\":\"dennycrafter/Noizes\"},\"payload\":{\"size\":1}}";
+
+            static HttpResponseMessage Resp(int code, string body, string etag)
+            {
+                var r = new HttpResponseMessage((System.Net.HttpStatusCode)code)
+                    { Content = new StringContent(body) };
+                if (etag != null) r.Headers.ETag = new EntityTagHeaderValue(etag);
+                return r;
+            }
+
+            var requests = new List<string>();
+            var cycle = 0;
+            var poller = new GitHubPoller();
+            poller.TestHttp = req =>
+            {
+                var url = req.RequestUri.PathAndQuery;
+                var inm = req.Headers.IfNoneMatch.Count > 0 ? req.Headers.IfNoneMatch.First().ToString() : "";
+                requests.Add($"{url} inm={inm}");
+                if (url.Contains("/users/"))
+                    return cycle == 1
+                        ? Resp(200, "[" + Ev("user-ev-1", "dennycrafter") + "]", "\"u1\"")
+                        : Resp(304, "[]", null);
+                return cycle switch
+                {
+                    1 => Resp(200, "[" + Ev("repo-old-1", "somecollab") + "]", "\"r1\""),
+                    2 => Resp(200, "[" + Ev("user-ev-1", "dennycrafter") + "]", "\"r1\""),
+                    _ => Resp(200, "[" + Ev("bot-ev-3", "obvious[bot]") + "]", "\"r1\""),
+                };
+            };
+
+            var captured = new List<string>();
+            Logger.Sink = captured.Add;
+            try
+            {
+                int Pushes() => captured.Count(l => l.Contains("github event: gh-push on dennycrafter/Noizes"));
+
+                cycle = 1; poller.PollOnce().Wait(); var c1 = Pushes(); // prime: history from both feeds
+                cycle = 2; poller.PollOnce().Wait(); var c2 = Pushes() - c1; // repo feed replays user-ev-1
+                cycle = 3; poller.PollOnce().Wait(); var c3 = Pushes() - c1 - c2; // push by obvious[bot] arrives
+
+                Check("repo-feed-dedupe", c1 == 0 && c2 == 0,
+                    $"prime={c1} replay={c2} - an id seen via the user feed must not re-fire from the repo feed");
+                Check("repo-feed-other-actor", c3 == 1,
+                    $"botPush={c3} - PushEvent by obvious[bot] must fire gh-push");
+                Check("repo-feed-etag",
+                    requests.Any(r => r.StartsWith("/users/dennycrafter/events") && r.Contains("\"u1\"")) &&
+                    requests.Any(r => r.StartsWith("/repos/dennycrafter/Noizes/events") && r.Contains("\"r1\"")) &&
+                    !requests.Any(r => r.Contains("not-a-repo")),
+                    string.Join(" | ", requests));
+                Check("repo-list-normalizes",
+                    GitHubPoller.NormalizeRepo(" https://github.com/dennycrafter/Noizes.git ") == "dennycrafter/Noizes" &&
+                    GitHubPoller.NormalizeRepo("dennycrafter/Noizes/") == "dennycrafter/Noizes" &&
+                    GitHubPoller.NormalizeRepo("no-slash") == null &&
+                    GitHubPoller.NormalizeRepo("a/b/c") == null &&
+                    GitHubPoller.NormalizeRepo("") == null);
+            }
+            finally
+            {
+                Logger.Sink = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("repo-feed-other-actor", false, ex.Message); }
 
         // report
         var report = string.Join(Environment.NewLine, Lines) + Environment.NewLine +
