@@ -34,6 +34,7 @@ public static class SelfTest
             var dir = Path.Combine(Path.GetTempPath(), "noizes-selftest-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             var cfg = new AppConfig { Port = 9999 };
+            AppConfig.EnsureDefaults(cfg);
             cfg.Events["claude-code-done"].Volume = 42;
             var path = Path.Combine(dir, "config.json");
             File.WriteAllText(path, JsonSerializer.Serialize(cfg));

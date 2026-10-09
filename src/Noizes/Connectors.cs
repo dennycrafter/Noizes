@@ -49,7 +49,10 @@ public static class HookFileMerger
             if (existed)
             {
                 var stamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-                File.Copy(filePath, filePath + ".noizes-backup-" + stamp, overwrite: false);
+                var backup = filePath + ".noizes-backup-" + stamp;
+                for (var n = 1; File.Exists(backup); n++) // two installs can land in the same second
+                    backup = filePath + ".noizes-backup-" + stamp + "-" + n;
+                File.Copy(filePath, backup, overwrite: false);
             }
 
             if (ensureVersion && !root.ContainsKey("version")) root["version"] = 1;
