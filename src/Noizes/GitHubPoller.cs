@@ -130,6 +130,26 @@ public class GitHubPoller
                         Fire("gh-checks-failed", repo);
                     break;
                 }
+
+                case "WatchEvent":
+                    if ((payload.TryGetProperty("action", out var aw) ? aw.GetString() : "") == "started")
+                        Fire("gh-star", repo);
+                    break;
+
+                case "IssuesEvent":
+                    if ((payload.TryGetProperty("action", out var ai) ? ai.GetString() : "") == "opened")
+                        Fire("gh-issue", repo);
+                    break;
+
+                case "IssueCommentEvent":
+                    if ((payload.TryGetProperty("action", out var ac) ? ac.GetString() : "") == "created")
+                        Fire("gh-comment", repo);
+                    break;
+
+                case "PullRequestReviewCommentEvent":
+                    if ((payload.TryGetProperty("action", out var ar) ? ar.GetString() : "") == "created")
+                        Fire("gh-comment", repo);
+                    break;
             }
         }
         catch (Exception ex)

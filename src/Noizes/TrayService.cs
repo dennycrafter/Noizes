@@ -11,6 +11,7 @@ public class TrayApplicationContext : ApplicationContext
     readonly HttpServer _server = new();
     readonly GitHubPoller _gh = new();
     readonly ClaudeDesktopWatcher _watcher = new();
+    readonly DeployPoller _deploy = new();
 
     public TrayApplicationContext(bool startWithUi)
     {
@@ -52,6 +53,7 @@ public class TrayApplicationContext : ApplicationContext
         _server.Start(AppConfig.Current.Port);
         _gh.Start();
         _watcher.Start();
+        _deploy.Start();
 
         if (startWithUi) ShowSettings();
     }
@@ -77,6 +79,7 @@ public class TrayApplicationContext : ApplicationContext
             _server.Stop();
             _gh.Stop();
             _watcher.Stop();
+            _deploy.Stop();
         }
         catch { }
         Application.Exit();
