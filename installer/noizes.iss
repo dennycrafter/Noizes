@@ -21,8 +21,6 @@ UninstallDisplayIcon={app}\Noizes.exe
 
 [Files]
 Source: "..\publish\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
-Source: "..\cli\noizes.cmd"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\cli\run.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Noizes"; Filename: "{app}\Noizes.exe"
