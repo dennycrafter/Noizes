@@ -24,8 +24,8 @@ public class CountdownConfig
 
 public class EventConfig
 {
-    public bool Enabled { get; set; } = true;
-    public int Volume { get; set; } = 80;
+    public bool Enabled { get; set; } = false;
+    public int Volume { get; set; } = 40;
     public string SoundPath { get; set; } = "";
     public List<string> FocusApps { get; set; } = new();
 }
