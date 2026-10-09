@@ -103,6 +103,50 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("cursor-merge", false, ex.Message); }
 
+        // 3b. SetupRunner: one idempotent command wires the hooks and exactly the core events
+        try
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "noizes-selftest-su-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            var claudePath = Path.Combine(dir, "claude", "settings.json");
+            var cursorPath = Path.Combine(dir, "cursor", "hooks.json");
+            var configPath = Path.Combine(dir, "config.json");
+
+            var exit = SetupRunner.Run(new SetupRunner.Options
+            {
+                ClaudePath = claudePath,
+                CursorPath = cursorPath,
+                ConfigPath = configPath,
+            });
+
+            var expected = SetupRunner.CoreEvents.OrderBy(x => x).ToList();
+            List<string> EnabledIds(AppConfig c) =>
+                c.Events.Where(kv => kv.Value.Enabled).Select(kv => kv.Key).OrderBy(x => x).ToList();
+
+            var cfg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
+            var on = cfg == null ? new List<string>() : EnabledIds(cfg);
+            var coreAt40 = cfg != null && SetupRunner.CoreEvents
+                .All(id => cfg.Events[id].Enabled && cfg.Events[id].Volume == 40);
+            var hooks = File.ReadAllText(claudePath).Contains("claude-code-done") &&
+                        File.ReadAllText(cursorPath).Contains("cursor-done");
+            Check("setup-runner", exit == 0 && on.SequenceEqual(expected) && coreAt40 && hooks,
+                $"exit={exit} enabled=[{string.Join(",", on)}]");
+
+            // run twice: still exactly the four core events, hooks not duplicated
+            var exit2 = SetupRunner.Run(new SetupRunner.Options
+            {
+                ClaudePath = claudePath,
+                CursorPath = cursorPath,
+                ConfigPath = configPath,
+            });
+            var cfg2 = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
+            var on2 = cfg2 == null ? new List<string>() : EnabledIds(cfg2);
+            var occurrences = File.ReadAllText(claudePath).Split("claude-code-done").Length - 1;
+            Check("setup-runner-idempotent", exit2 == 0 && on2.SequenceEqual(expected) && occurrences == 1,
+                $"exit={exit2} occurrences={occurrences}");
+        }
+        catch (Exception ex) { Check("setup-runner", false, ex.Message); }
+
         // 4. default sounds decode
         try
         {
