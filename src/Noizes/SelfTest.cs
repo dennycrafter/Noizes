@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -23,6 +25,15 @@ public static class SelfTest
         var line = $"{(ok ? "PASS" : "FAIL")} {name}{(string.IsNullOrEmpty(detail) ? "" : " - " + detail)}";
         Lines.Add(line);
         if (!ok) _fails++;
+    }
+
+    static int FreePort()
+    {
+        var l = new TcpListener(IPAddress.Loopback, 0);
+        l.Start();
+        var p = ((IPEndPoint)l.LocalEndpoint).Port;
+        l.Stop();
+        return p;
     }
 
     public static int Run()
@@ -143,6 +154,24 @@ public static class SelfTest
             server.Stop();
         }
         catch (Exception ex) { Check("http-event", false, ex.Message); }
+
+        // 5b. port already taken: the server must fail gracefully instead of crashing startup
+        try
+        {
+            var blockerPort = FreePort();
+            var blocker = new HttpServer();
+            blocker.Start(blockerPort);
+
+            var victim = new HttpServer();
+            Exception busy = null;
+            try { victim.Start(blockerPort); }
+            catch (Exception ex) { busy = ex; }
+            Check("http-port-busy", busy == null,
+                busy == null ? "bind on a busy port failed gracefully" : busy.GetType().Name + ": " + busy.Message);
+
+            blocker.Stop();
+        }
+        catch (Exception ex) { Check("http-port-busy", false, ex.Message); }
 
         // 6. quiet hours logic
         try
