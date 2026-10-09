@@ -27,6 +27,11 @@ public class CountdownConfig
     public DateTime TargetLocal { get; set; } = DateTime.Today.AddDays(1).AddHours(12);
 }
 
+public class FeaturesConfig
+{
+    public bool ClaudeDesktopWatcher { get; set; } = false; // UIA watcher is opt-in
+}
+
 public class EventConfig
 {
     public bool Enabled { get; set; } = false;
@@ -44,6 +49,7 @@ public class AppConfig
     public GitHubConfig GitHub { get; set; } = new();
     public List<string> UptimeUrls { get; set; } = new();
     public CountdownConfig Countdown { get; set; } = new();
+    public FeaturesConfig Features { get; set; } = new();
     public Dictionary<string, EventConfig> Events { get; set; } = new();
 
     public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Noizes");

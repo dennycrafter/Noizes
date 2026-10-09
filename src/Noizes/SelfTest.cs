@@ -358,6 +358,20 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("repo-feed-other-actor", false, ex.Message); }
 
+        // 7b. features flag: old configs without the group default to watcher-off; the flag roundtrips
+        try
+        {
+            var loaded = JsonSerializer.Deserialize<AppConfig>("{}");
+            Check("features-default-off", loaded?.Features != null && !loaded.Features.ClaudeDesktopWatcher);
+
+            var withFlag = JsonSerializer.Deserialize<AppConfig>("{\"Features\":{\"ClaudeDesktopWatcher\":true}}");
+            Check("features-roundtrip", withFlag?.Features.ClaudeDesktopWatcher == true);
+
+            var reloaded = JsonSerializer.Deserialize<AppConfig>(JsonSerializer.Serialize(withFlag));
+            Check("features-save-reload", reloaded?.Features.ClaudeDesktopWatcher == true);
+        }
+        catch (Exception ex) { Check("features-default-off", false, ex.Message); }
+
         // report
         var report = string.Join(Environment.NewLine, Lines) + Environment.NewLine +
                      $"SUMMARY: {Lines.Count - _fails} passed, {_fails} failed" + Environment.NewLine;

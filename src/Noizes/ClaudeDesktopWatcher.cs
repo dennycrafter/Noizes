@@ -15,15 +15,25 @@ public class ClaudeDesktopWatcher
 {
     Timer _timer;
     bool _stopSeen;
+    bool _running;
     DateTime _lastFireUtc = DateTime.MinValue;
 
     public void Start()
     {
+        if (_running) return; // start/stop may be called repeatedly as the feature flag changes
+        _running = true;
+        _stopSeen = false; // a stale stop-seen from a previous run must not fire a spurious event
         _timer = new Timer(_ => TickSafe(), null, TimeSpan.Zero, TimeSpan.FromSeconds(2));
         Logger.Info("claude desktop watcher started");
     }
 
-    public void Stop() => _timer?.Change(Timeout.Infinite, Timeout.Infinite);
+    public void Stop()
+    {
+        if (!_running) return;
+        _running = false;
+        _timer?.Change(Timeout.Infinite, Timeout.Infinite);
+        Logger.Info("claude desktop watcher stopped");
+    }
 
     void TickSafe()
     {
