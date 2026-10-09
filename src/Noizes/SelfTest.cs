@@ -269,6 +269,12 @@ public static class SelfTest
                     requests.Any(r => r.StartsWith("/repos/dennycrafter/Noizes/events") && r.Contains("\"r1\"")) &&
                     !requests.Any(r => r.Contains("not-a-repo")),
                     string.Join(" | ", requests));
+                Check("repo-list-normalizes",
+                    GitHubPoller.NormalizeRepo(" https://github.com/dennycrafter/Noizes.git ") == "dennycrafter/Noizes" &&
+                    GitHubPoller.NormalizeRepo("dennycrafter/Noizes/") == "dennycrafter/Noizes" &&
+                    GitHubPoller.NormalizeRepo("no-slash") == null &&
+                    GitHubPoller.NormalizeRepo("a/b/c") == null &&
+                    GitHubPoller.NormalizeRepo("") == null);
             }
             finally
             {
