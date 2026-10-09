@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Reflection;
+using System.Text.Json.Nodes;
 using NAudio.Wave;
 
 namespace Noizes;
@@ -88,6 +90,120 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("defaults-off", false, ex.Message); }
 
+        // 1c. every persisted setting's default, asserted by name (owner directive: the
+        // whole config surface, not just headline values). Two failure modes: a recorded
+        // default that changed, and a config property with no recorded default - new
+        // settings must state their default here or the sweep fails.
+        try
+        {
+            var cfg = new AppConfig();
+            AppConfig.EnsureDefaults(cfg);
+            var problems = new List<string>();
+
+            // the Countdown default is "noon the next day" evaluated at construction -
+            // assert the shape, not a date literal
+            bool NoonTomorrow(object v) =>
+                v is DateTime d && d.Date == DateTime.Today.AddDays(1) && d.Hour == 12 && d.Minute == 0 && d.Second == 0;
+
+            var expected = new (string Path, Func<object, bool> Match, string Describe)[]
+            {
+                ("Port", v => v is 7351, "7351"),
+                ("StartWithWindows", v => v is true, "true - the tray app is present by default"),
+                ("OnlyWhenUnfocused", v => v is true, "true"),
+                ("Quiet.Enabled", v => v is false, "false"),
+                ("Quiet.Start", v => v is "22:00", "\"22:00\""),
+                ("Quiet.End", v => v is "07:00", "\"07:00\""),
+                ("Quiet.AllowAlarms", v => v is true, "true"),
+                ("GitHub.Token", v => v is "", "empty string"),
+                ("GitHub.Username", v => v is "dennycrafter", "\"dennycrafter\""),
+                ("GitHub.PollSeconds", v => v is 10, "10 (clamped 5..300 at use)"),
+                ("GitHub.Repos", v => v is List<string> r && r.Count == 0, "empty"),
+                ("UptimeUrls", v => v is List<string> u && u.Count == 0, "empty"),
+                ("Countdown.Enabled", v => v is false, "false"),
+                ("Countdown.TargetLocal", NoonTomorrow, "noon the day after creation"),
+            };
+
+            object ReadPath(string path)
+            {
+                object current = cfg;
+                foreach (var seg in path.Split('.'))
+                {
+                    var prop = current.GetType().GetProperty(seg);
+                    if (prop == null)
+                        throw new InvalidOperationException($"no property '{seg}' on {current.GetType().Name} (path {path})");
+                    current = prop.GetValue(current);
+                }
+                return current;
+            }
+
+            foreach (var row in expected)
+            {
+                object actual;
+                try { actual = ReadPath(row.Path); }
+                catch (Exception ex) { problems.Add($"{row.Path}: {ex.Message}"); continue; }
+                if (!row.Match(actual))
+                    problems.Add($"{row.Path}: expected {row.Describe}, actual {(actual == null ? "null" : actual.ToString())}");
+            }
+
+            // every public instance property of every config class must have a recorded
+            // default above (Events is asserted per event in all-defaults-events)
+            var covered = expected.Select(e => e.Path).ToHashSet();
+            foreach (var p in typeof(AppConfig).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (p.Name == "Events") continue; // per-event defaults -> all-defaults-events
+                if (p.PropertyType == typeof(QuietHoursConfig) || p.PropertyType == typeof(GitHubConfig) ||
+                    p.PropertyType == typeof(CountdownConfig))
+                {
+                    foreach (var sp in p.PropertyType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                        if (!covered.Remove(p.Name + "." + sp.Name))
+                            problems.Add($"no expected default recorded for {p.Name}.{sp.Name}");
+                }
+                else if (!covered.Remove(p.Name))
+                    problems.Add($"no expected default recorded for {p.Name}");
+            }
+            foreach (var leftover in covered) // recorded row with no matching property
+                problems.Add($"expected-default row '{leftover}' matches no property");
+
+            Check("all-defaults-settings", problems.Count == 0,
+                problems.Count == 0 ? $"{expected.Length} settings asserted" : string.Join("; ", problems));
+        }
+        catch (Exception ex) { Check("all-defaults-settings", false, ex.Message); }
+
+        // 1d. per-event defaults: every registry event present at the fresh-install values.
+        // FocusApps is empty in config even where EventRegistry carries DefaultFocusApps -
+        // that fallback applies at dispatch time (EventBus), not in the stored config.
+        try
+        {
+            var cfg = new AppConfig();
+            AppConfig.EnsureDefaults(cfg);
+            var problems = new List<string>();
+
+            foreach (var def in EventRegistry.All)
+            {
+                if (!cfg.Events.TryGetValue(def.Id, out var ec)) { problems.Add($"{def.Id}: no config entry"); continue; }
+                if (ec.Enabled) problems.Add($"{def.Id}.Enabled: expected false, actual true");
+                if (ec.Volume != 40) problems.Add($"{def.Id}.Volume: expected 40, actual {ec.Volume}");
+                if (ec.SoundPath != "") problems.Add($"{def.Id}.SoundPath: expected empty, actual \"{ec.SoundPath}\"");
+                if (ec.FocusApps.Count != 0)
+                    problems.Add($"{def.Id}.FocusApps: expected empty, actual [{string.Join(",", ec.FocusApps)}]");
+            }
+            foreach (var extra in cfg.Events.Keys.Except(EventRegistry.All.Select(d => d.Id)))
+                problems.Add($"Events[{extra}]: not in EventRegistry");
+
+            // every persisted per-event property must be asserted above
+            var asserted = new HashSet<string> { "Enabled", "Volume", "SoundPath", "FocusApps" };
+            var fields = asserted.Count;
+            foreach (var p in typeof(EventConfig).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                if (!asserted.Remove(p.Name))
+                    problems.Add($"EventConfig.{p.Name}: no default assertion recorded");
+            foreach (var leftover in asserted)
+                problems.Add($"EventConfig.{leftover}: asserted but no such property");
+
+            Check("all-defaults-events", problems.Count == 0,
+                problems.Count == 0 ? $"{EventRegistry.All.Length} events x {fields} fields asserted" : string.Join("; ", problems));
+        }
+        catch (Exception ex) { Check("all-defaults-events", false, ex.Message); }
+
         // 2. Claude Code hook merge (with an existing hook that must survive)
         try
         {
@@ -161,7 +277,13 @@ public static class SelfTest
             Check("setup-runner", exit == 0 && on.SequenceEqual(expected) && coreAt40 && hooks,
                 $"exit={exit} enabled=[{string.Join(",", on)}]");
 
-            // run twice: still exactly the four core events, hooks not duplicated
+            // run twice: idempotent end to end - hooks keep exactly one entry per hook
+            // (no duplicates, no new backups), exactly the four core events are on at 40,
+            // and the second saved config is semantically identical to the first's
+            // (parsed JSON, not bytes)
+            var configAfterRun1 = File.ReadAllText(configPath);
+            var backupsAfterRun1 = Directory.GetFiles(dir, "*.noizes-backup-*").Length;
+
             var exit2 = SetupRunner.Run(new SetupRunner.Options
             {
                 ClaudePath = claudePath,
@@ -170,9 +292,33 @@ public static class SelfTest
             });
             var cfg2 = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(configPath));
             var on2 = cfg2 == null ? new List<string>() : EnabledIds(cfg2);
-            var occurrences = File.ReadAllText(claudePath).Split("claude-code-done").Length - 1;
-            Check("setup-runner-idempotent", exit2 == 0 && on2.SequenceEqual(expected) && occurrences == 1,
-                $"exit={exit2} occurrences={occurrences}");
+
+            // the unique event URLs are the hook entries - each must appear exactly once
+            var claudeText = File.ReadAllText(claudePath);
+            var cursorText = File.ReadAllText(cursorPath);
+            var occClaudeDone = claudeText.Split("/event/claude-code-done").Length - 1;
+            var occClaudeInput = claudeText.Split("/event/claude-code-input").Length - 1;
+            var occCursorDone = cursorText.Split("/event/cursor-done").Length - 1;
+
+            var coreOnAt40 = cfg2 != null && SetupRunner.CoreEvents
+                .All(id => cfg2.Events[id].Enabled && cfg2.Events[id].Volume == 40);
+            var restUntouched = cfg2 != null && cfg2.Events
+                .Where(kv => !SetupRunner.CoreEvents.Contains(kv.Key))
+                .All(kv => !kv.Value.Enabled && kv.Value.Volume == 40);
+
+            var node1 = JsonNode.Parse(configAfterRun1);
+            var node2 = JsonNode.Parse(File.ReadAllText(configPath));
+            var sameConfig = node1 != null && node2 != null && JsonNode.DeepEquals(node1, node2);
+
+            // a second run must not touch the hook files again ("already" short-circuits
+            // before the backup step), so no backup can appear between the runs
+            var noNewBackups = Directory.GetFiles(dir, "*.noizes-backup-*").Length == backupsAfterRun1;
+
+            Check("setup-idempotent", exit2 == 0 && on2.SequenceEqual(expected)
+                    && occClaudeDone == 1 && occClaudeInput == 1 && occCursorDone == 1
+                    && coreOnAt40 && restUntouched && sameConfig && noNewBackups,
+                $"exit={exit2} claude={occClaudeDone}/{occClaudeInput} cursor={occCursorDone} " +
+                $"sameConfig={sameConfig} enabled=[{string.Join(",", on2)}]");
         }
         catch (Exception ex) { Check("setup-runner", false, ex.Message); }
 
