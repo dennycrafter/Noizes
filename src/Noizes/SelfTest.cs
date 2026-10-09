@@ -159,6 +159,51 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("quiet-window", false, ex.Message); }
 
+        // 7. skip-reason logging: every suppressed dispatch explains itself
+        try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            var captured = new List<string>();
+            Logger.Sink = captured.Add;
+            try
+            {
+                // fresh all-off config -> the disabled skip must explain itself
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+                EventBus.Dispatch("claude-code-done");
+                var disabled = captured.Contains("event claude-code-done: skipped (disabled)");
+
+                // event on + quiet window centered on the current time -> the quiet-hours
+                // skip must explain itself (a fixed 00:00-23:59 window misses 23:59:xx)
+                captured.Clear();
+                cfg.Events["claude-code-done"].Enabled = true;
+                var now = DateTime.Now.TimeOfDay;
+                string wrap(TimeSpan t)
+                {
+                    if (t < TimeSpan.Zero) t += TimeSpan.FromHours(24);
+                    if (t >= TimeSpan.FromHours(24)) t -= TimeSpan.FromHours(24);
+                    return t.ToString(@"hh\:mm\:ss");
+                }
+                cfg.Quiet.Enabled = true;
+                cfg.Quiet.Start = wrap(now - TimeSpan.FromHours(1));
+                cfg.Quiet.End = wrap(now + TimeSpan.FromHours(1));
+                EventBus.Dispatch("claude-code-done");
+                var quiet = captured.Contains("event claude-code-done: skipped (quiet-hours)");
+
+                Check("skip-logging", disabled && quiet,
+                    disabled && quiet ? "disabled + quiet-hours lines captured"
+                        : $"disabled={disabled} quiet={quiet} captured: {string.Join(" | ", captured)}");
+            }
+            finally
+            {
+                Logger.Sink = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("skip-logging", false, ex.Message); }
+
         // report
         var report = string.Join(Environment.NewLine, Lines) + Environment.NewLine +
                      $"SUMMARY: {Lines.Count - _fails} passed, {_fails} failed" + Environment.NewLine;
