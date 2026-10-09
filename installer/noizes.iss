@@ -18,6 +18,9 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\Noizes.exe
+; Setup and the uninstaller notify running apps (notably Explorer) to reload the
+; environment from the registry - covers the PATH change made in the [Code] section.
+ChangesEnvironment=yes
 
 [Files]
 Source: "..\publish\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
@@ -33,26 +36,12 @@ Filename: "{app}\Noizes.exe"; Description: "Launch Noizes"; Flags: nowait postin
 [Code]
 
 // Put {app} on the user PATH so `noizes setup` works from a fresh terminal, and take it
-// off again on uninstall. Running Explorer is told about the change (WM_SETTINGCHANGE)
-// so a NEW terminal picks it up immediately - no logoff needed.
+// off again on uninstall. The ChangesEnvironment directive makes Setup and the
+// uninstaller broadcast WM_SETTINGCHANGE afterwards, so a NEW terminal picks up the
+// change immediately - no manual SendMessage, no logoff needed.
 
 const
   EnvironmentKey = 'Environment';
-  WM_SETTINGCHANGE = $001A;
-  SMTO_ABORTIFHUNG = $0002;
-  // HWND_BROADCAST ($FFFF) is predefined by Inno Setup's script engine - redeclaring it is a duplicate-identifier error
-
-procedure SendMessageTimeout(hWnd: HWND; Msg: UINT; wParam: WPARAM; lParam: LPARAM;
-  fuFlags: UINT; uTimeout: UINT; var lpdwResult: DWORD);
-  external 'SendMessageTimeoutW@user32.dll stdcall';
-
-procedure NotifyEnvironmentChanged;
-var
-  Res: DWORD;
-begin
-  SendMessageTimeout(HWND_BROADCAST, WM_SETTINGCHANGE, 0,
-    LPARAM(PChar('Environment')), SMTO_ABORTIFHUNG, 5000, Res);
-end;
 
 function PathHasEntry(const paths, dir: string): Boolean;
 begin
@@ -71,9 +60,7 @@ begin
     Updated := dir
   else
     Updated := Paths + ';' + dir;
-  // expandsz keeps REG_EXPAND_SZ so entries like %USERPROFILE% keep working
-  RegWriteExpandStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Updated);
-  NotifyEnvironmentChanged;
+  RegWriteStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Updated);
 end;
 
 procedure EnvRemovePath(const dir: string);
@@ -111,8 +98,7 @@ begin
   if Updated = '' then
     RegDeleteValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path')
   else
-    RegWriteExpandStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Updated);
-  NotifyEnvironmentChanged;
+    RegWriteStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Updated);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
