@@ -7,8 +7,10 @@ using Timer = System.Threading.Timer;
 namespace Noizes;
 
 /// <summary>
-/// Polls the GitHub events API every 30 seconds and fires events for pushes,
-/// PRs opened/merged and failed checks. Tier 3 adds stars, issues and comments.
+/// Polls the GitHub events API on a configurable interval (default 10 s, clamped 5-300 s)
+/// and fires events for pushes, PRs opened/merged and failed checks. Tier 3 adds stars,
+/// issues and comments. ETag conditional requests and the rate-limit cooldown keep the
+/// cost at one cheap conditional request per interval.
 /// </summary>
 public class GitHubPoller
 {
@@ -19,8 +21,24 @@ public class GitHubPoller
     DateTime _cooldownUntil;
     Timer _timer;
 
-    public void Start() => _timer = new Timer(_ => _ = PollSafe(), null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
+    /// <summary>Interval the timer is currently armed with, in seconds (clamped 5..300).</summary>
+    public int PollSeconds { get; private set; }
+
+    public void Start()
+    {
+        PollSeconds = Math.Clamp(AppConfig.Current.GitHub.PollSeconds, 5, 300);
+        _timer = new Timer(_ => _ = PollSafe(), null, TimeSpan.Zero, TimeSpan.FromSeconds(PollSeconds));
+    }
+
     public void Stop() => _timer?.Change(Timeout.Infinite, Timeout.Infinite);
+
+    /// <summary>Re-arms the timer from the current config; used when settings change the interval.</summary>
+    public void Restart()
+    {
+        if (_timer == null) return; // never started
+        PollSeconds = Math.Clamp(AppConfig.Current.GitHub.PollSeconds, 5, 300);
+        _timer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(PollSeconds));
+    }
 
     async Task PollSafe()
     {
