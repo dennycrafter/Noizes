@@ -105,6 +105,8 @@ public class HttpServer
         if (path.StartsWith("/event/") && (method == "GET" || method == "POST"))
         {
             var id = path.Substring(7);
+            if (EventRegistry.Get(id) == null)
+                return (404, JsonFor(id, new DispatchResult(false, "unknown-event")));
             var res = HandleEvent(id, query);
             return (res.Reason == "unknown-event" ? 404 : 200, JsonFor(id, res));
         }
