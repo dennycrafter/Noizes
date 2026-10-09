@@ -121,6 +121,7 @@ public static class SelfTest
                 ("UptimeUrls", v => v is List<string> u && u.Count == 0, "empty"),
                 ("Countdown.Enabled", v => v is false, "false"),
                 ("Countdown.TargetLocal", NoonTomorrow, "noon the day after creation"),
+                ("Features.ClaudeDesktopWatcher", v => v is false, "false - UIA watcher is opt-in"),
             };
 
             object ReadPath(string path)
@@ -152,7 +153,7 @@ public static class SelfTest
             {
                 if (p.Name == "Events") continue; // per-event defaults -> all-defaults-events
                 if (p.PropertyType == typeof(QuietHoursConfig) || p.PropertyType == typeof(GitHubConfig) ||
-                    p.PropertyType == typeof(CountdownConfig))
+                    p.PropertyType == typeof(CountdownConfig) || p.PropertyType == typeof(FeaturesConfig))
                 {
                     foreach (var sp in p.PropertyType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                         if (!covered.Remove(p.Name + "." + sp.Name))
