@@ -16,7 +16,7 @@ public class SettingsForm : Form
     readonly ListView _list = new();
     readonly CheckBox _chkEnabled = new() { Text = "Play this event", AutoSize = true };
     readonly TrackBar _vol = new() { TickStyle = TickStyle.None, Minimum = 0, Maximum = 100, Width = 180 };
-    readonly Label _lblVol = new() { Text = "80%", Width = 44, TextAlign = ContentAlignment.MiddleLeft };
+    readonly Label _lblVol = new() { Width = 44, TextAlign = ContentAlignment.MiddleLeft }; // text always comes from the event's real volume
     readonly TextBox _txtSound = new() { ReadOnly = true, Width = 280 };
     readonly TextBox _txtFocusApps = new() { Width = 300 };
     readonly Button _btnBrowse = new() { Text = "Choose sound..." };
@@ -116,16 +116,10 @@ public class SettingsForm : Form
         _list.Dock = DockStyle.Fill;
         foreach (var def in EventRegistry.All)
         {
-            var ec = AppConfig.Current.Events[def.Id];
-            var item = new ListViewItem(new[]
-            {
-                def.DisplayName,
-                ec.Enabled ? "On" : "Off",
-                ec.Volume + "%",
-                string.IsNullOrEmpty(ec.SoundPath) ? "(default)" : Path.GetFileName(ec.SoundPath)
-            });
+            var item = new ListViewItem(new[] { def.DisplayName, "", "", "" });
             item.Tag = def.Id;
             _list.Items.Add(item);
+            StyleEventRow(item);
         }
         _list.SelectedIndexChanged += (s, e) => LoadSelectedEvent();
 
@@ -137,7 +131,7 @@ public class SettingsForm : Form
         var volPanel = new FlowLayoutPanel { AutoSize = true, Height = 36, Width = 320 };
         volPanel.Controls.Add(_vol);
         volPanel.Controls.Add(_lblVol);
-        _vol.Scroll += (s, e) => _lblVol.Text = _vol.Value + "%";
+        _vol.Scroll += (s, e) => RefreshVolumeLabel();
         grid.Controls.Add(volPanel, 1, 1);
         grid.Controls.Add(new Label { Text = "Sound:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 2);
         var soundPanel = new FlowLayoutPanel { AutoSize = true, Height = 36, Width = 600 };
@@ -437,7 +431,7 @@ public class SettingsForm : Form
         var ec = AppConfig.Current.Events[_currentEvent];
         _chkEnabled.Checked = ec.Enabled;
         _vol.Value = Math.Clamp(ec.Volume, 0, 100);
-        _lblVol.Text = _vol.Value + "%";
+        RefreshVolumeLabel();
         _txtSound.Text = ec.SoundPath ?? "";
         _txtFocusApps.Text = string.Join(", ", ec.FocusApps);
     }
@@ -452,25 +446,28 @@ public class SettingsForm : Form
         ec.FocusApps = _txtFocusApps.Text
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToList();
-        foreach (ListViewItem item in _list.Items)
-        {
-            if ((string)item.Tag != _currentEvent) continue;
-            item.SubItems[1].Text = ec.Enabled ? "On" : "Off";
-            item.SubItems[2].Text = ec.Volume + "%";
-            item.SubItems[3].Text = string.IsNullOrEmpty(ec.SoundPath) ? "(default)" : Path.GetFileName(ec.SoundPath);
-        }
+        RefreshList();
     }
 
     void RefreshList()
     {
         foreach (ListViewItem item in _list.Items)
-        {
-            var ec = AppConfig.Current.Events[(string)item.Tag];
-            item.SubItems[1].Text = ec.Enabled ? "On" : "Off";
-            item.SubItems[2].Text = ec.Volume + "%";
-            item.SubItems[3].Text = string.IsNullOrEmpty(ec.SoundPath) ? "(default)" : Path.GetFileName(ec.SoundPath);
-        }
+            StyleEventRow(item);
     }
+
+    /// <summary>One place for the row's text and state styling so On/Off can't be missed.</summary>
+    void StyleEventRow(ListViewItem item)
+    {
+        var ec = AppConfig.Current.Events[(string)item.Tag];
+        item.UseItemStyleForSubItems = false;
+        item.SubItems[1].Text = ec.Enabled ? "On" : "Off";
+        item.SubItems[1].ForeColor = ec.Enabled ? Color.FromArgb(0, 128, 0) : Color.Gray;
+        item.SubItems[1].Font = ec.Enabled ? _boldFont : _list.Font; // reset font so a row turned Off isn't left bold
+        item.SubItems[2].Text = ec.Volume + "%";
+        item.SubItems[3].Text = string.IsNullOrEmpty(ec.SoundPath) ? "(default)" : Path.GetFileName(ec.SoundPath);
+    }
+
+    void RefreshVolumeLabel() => _lblVol.Text = _vol.Value + "%";
 
     void BrowseSound()
     {
