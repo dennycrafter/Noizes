@@ -283,7 +283,7 @@ public class SettingsForm : Form
         _ghPanel = new GroupBox
         {
             Text = "GitHub settings", Dock = DockStyle.Bottom, Visible = false,
-            Padding = new Padding(10)
+            AutoSize = true, Padding = new Padding(10)
         };
         var p = new FlowLayoutPanel
         {
