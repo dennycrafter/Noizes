@@ -31,6 +31,14 @@ public static class SelfTest
         if (!ok) _fails++;
     }
 
+    // A lane G check that targets the v1.3.0 surface before it merges: reported
+    // honestly as SKIP (never FAIL, never a silent pass) and asserted for real
+    // once the surface lands. Runs on a real Windows CI machine either way.
+    static void Skip(string name, string reason)
+    {
+        Lines.Add($"SKIP {name} - {reason}");
+    }
+
     static int FreePort()
     {
         var l = new TcpListener(IPAddress.Loopback, 0);
@@ -591,6 +599,114 @@ public static class SelfTest
             }
         }
         catch (Exception ex) { Check("dedup-reason", false, ex.Message); }
+
+        // 9a. lane G: a v1.2.0 config file must load with every value unchanged.
+        // The fixture holds every persisted property at a non-default value, so
+        // any lossy migration or rename shows up as a specific diff.
+        try
+        {
+            const string v120 = @"{
+  ""Port"": 7352,
+  ""StartWithWindows"": false,
+  ""OnlyWhenUnfocused"": false,
+  ""Quiet"": { ""Enabled"": true, ""Start"": ""23:00"", ""End"": ""06:30"", ""AllowAlarms"": false },
+  ""GitHub"": { ""Token"": ""tok_123"", ""Username"": ""den"", ""PollSeconds"": 30, ""Repos"": [""a/b""] },
+  ""UptimeUrls"": [""https://example.com""],
+  ""Countdown"": { ""Enabled"": true, ""TargetLocal"": ""2026-12-01T12:00:00"" },
+  ""Features"": { ""ClaudeDesktopWatcher"": true },
+  ""Events"": { ""claude-code-done"": { ""Enabled"": true, ""Volume"": 65, ""SoundPath"": ""C:\\sounds\\win.mp3"", ""FocusApps"": [""code""] } }
+}";
+            var loaded = JsonSerializer.Deserialize<AppConfig>(v120);
+            var ec = loaded?.Events.TryGetValue("claude-code-done", out var cc) == true ? cc : null;
+            var oldOk = loaded != null && loaded.Port == 7352 && !loaded.StartWithWindows && !loaded.OnlyWhenUnfocused
+                && loaded.Quiet.Enabled && loaded.Quiet.Start == "23:00" && loaded.Quiet.End == "06:30" && !loaded.Quiet.AllowAlarms
+                && loaded.GitHub.Token == "tok_123" && loaded.GitHub.Username == "den" && loaded.GitHub.PollSeconds == 30
+                && loaded.GitHub.Repos.SequenceEqual(new[] { "a/b" })
+                && loaded.UptimeUrls.SequenceEqual(new[] { "https://example.com" })
+                && loaded.Countdown.Enabled && loaded.Countdown.TargetLocal == new DateTime(2026, 12, 1, 12, 0, 0)
+                && loaded.Features.ClaudeDesktopWatcher
+                && ec != null && ec.Enabled && ec.Volume == 65
+                && ec.SoundPath == "C:\\sounds\\win.mp3" && ec.FocusApps.SequenceEqual(new[] { "code" });
+            Check("old-config-v1.2.0-loads", oldOk,
+                oldOk ? "every v1.2.0 value survived the roundtrip" : "a v1.2.0 value changed while loading");
+        }
+        catch (Exception ex) { Check("old-config-v1.2.0-loads", false, ex.Message); }
+
+        // 9b. lane G: the v1.3.0 mute gate (skip reason "muted") and the self-clearing
+        // MutedUntil. These live in the lane B bridge work, so they resolve through
+        // reflection: SKIP with a reason on a tree that predates the merge, and a
+        // hard assertion the moment the surface lands.
+        var mutedProp = typeof(AppConfig).GetProperty("Muted");
+        var untilProp = typeof(AppConfig).GetProperty("MutedUntil");
+        var isMuted = typeof(EventBus).GetMethod("IsMuted", new[] { typeof(AppConfig) });
+        if (mutedProp == null || untilProp == null || isMuted == null)
+        {
+            Skip("mute-skips", "v1.3.0 mute surface not merged yet (lanes A and B pending)");
+            Skip("muted-until-clears", "v1.3.0 mute surface not merged yet (lanes A and B pending)");
+        }
+        else try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            var captured = new List<string>();
+            Logger.Sink = captured.Add;
+            try
+            {
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                cfg.Events["claude-code-done"].Enabled = true;
+                mutedProp.SetValue(cfg, true);
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+                var r = EventBus.Dispatch("claude-code-done");
+                var logged = captured.Contains("event claude-code-done: skipped (muted)");
+                Check("mute-skips", r.Reason == "muted" && logged, $"reason={r.Reason} logged={logged}");
+
+                // a MutedUntil in the past clears itself, so a stale mute never sticks
+                untilProp.SetValue(cfg, DateTime.Now.AddMinutes(-5));
+                var gateActive = (bool)isMuted.Invoke(null, new object[] { cfg });
+                var cleared = untilProp.GetValue(cfg) == null;
+                Check("muted-until-clears", !gateActive && cleared, $"cleared={cleared} gateActive={gateActive}");
+            }
+            finally
+            {
+                Logger.Sink = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("mute-skips", false, ex.Message); }
+
+        // 9c. lane G: one source of truth - turning the Claude desktop event off must
+        // also set Features.ClaudeDesktopWatcher = false. That coupling ships with the
+        // lane B bridge, so the same reflection gate applies.
+        var bridge = typeof(SelfTest).Assembly.GetType("Noizes.UiBridge", false);
+        var setEventEnabled = bridge?.GetMethod("SetEventEnabled", new[] { typeof(string), typeof(bool) });
+        if (bridge == null || setEventEnabled == null)
+        {
+            Skip("claude-desktop-sync", "v1.3.0 bridge not merged yet (lane B pending)");
+        }
+        else try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            try
+            {
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+                setEventEnabled.Invoke(null, new object[] { "claude-desktop-done", false });
+                var off = cfg.Events["claude-desktop-done"].Enabled == false && !cfg.Features.ClaudeDesktopWatcher;
+                Check("claude-desktop-sync", off,
+                    off ? "the event switch took the watcher flag down with it"
+                        : $"event={cfg.Events["claude-desktop-done"].Enabled} flag={cfg.Features.ClaudeDesktopWatcher}");
+            }
+            finally
+            {
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("claude-desktop-sync", false, ex.Message); }
 
         // 9. windows CI only: the settings form must construct headless - no Show(), so no
         // window handles (MessageBox lives only in click handlers, never in the ctor).

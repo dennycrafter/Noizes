@@ -1,0 +1,14 @@
+{
+  "name": "noizes-ui-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright suite for the Noizes v1.3.0 settings window: bridge contract, UI checks, screenshots",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "axe-core": "^4.10.0"
+  }
+}
