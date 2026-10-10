@@ -71,12 +71,14 @@
     reqId += 1;
     var id = reqId;
     var msg = Object.assign({ id: id }, payload);
+    window.__noizesLastRequest = { id: id, type: payload && payload.type }; // evidence trail
     return new Promise(function (resolve) {
       pendingReplies.set(id, resolve);
       wv.postMessage(msg);
       window.setTimeout(function () {
         if (pendingReplies.has(id)) {
           pendingReplies.delete(id);
+          window.__noizesLastResult = { id: id, timedOut: true }; // evidence trail
           resolve({ id: id, ok: false, error: "The app did not answer this request." });
         }
       }, 5000);
@@ -98,6 +100,7 @@
       var resolve = pendingReplies.get(msg.id);
       if (resolve) {
         pendingReplies.delete(msg.id);
+        window.__noizesLastResult = { id: msg.id, ok: msg.ok }; // evidence trail
         resolve(msg);
       }
     }

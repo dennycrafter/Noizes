@@ -403,7 +403,7 @@ public static class SettingsWindow
                     try
                     {
                         var dom = await _web.CoreWebView2.ExecuteScriptAsync(
-                            "JSON.stringify({errors:(window.__noizesErrors||[]).slice(0,5),stub:!!window.__noizesStubInstalled,chrome:typeof window.chrome,webview:typeof (window.chrome&&window.chrome.webview),body:document.body.innerHTML})");
+                            "JSON.stringify({errors:(window.__noizesErrors||[]).slice(0,5),stub:!!window.__noizesStubInstalled,chrome:typeof window.chrome,webview:typeof (window.chrome&&window.chrome.webview),postFn:typeof (window.chrome&&window.chrome.webview&&window.chrome.webview.postMessage),lastReq:window.__noizesLastRequest||null,lastRes:window.__noizesLastResult||null,probe:(function(){try{window.chrome.webview.postMessage({probe:1});return 'posted';}catch(e){return 'threw:'+e.message;}})(),body:document.body.innerHTML})");
                         Console.WriteLine("capture poll gave up after ~10s without rows; page said: " +
                             (dom.Length > 2000 ? dom.Substring(0, 2000) + "...(truncated)" : dom));
                     }
