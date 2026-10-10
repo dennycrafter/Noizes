@@ -113,6 +113,8 @@
   /* Every message from section 2 of the brief, as a promise returning the reply. */
 
   var api = {
+    // flat escape hatch for page modules that build their own messages
+    request: function (fields) { return request(fields); },
     getState: function () { return request({ type: "getState" }); },
     setEvent: function (fields) { return request(Object.assign({ type: "setEvent" }, fields)); },
     setGroup: function (group, enabled) { return request({ type: "setGroup", group: group, enabled: enabled }); },

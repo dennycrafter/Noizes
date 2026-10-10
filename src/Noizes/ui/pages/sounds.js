@@ -128,7 +128,9 @@
     '}',
     '.snd-row + .snd-row { border-top: 1px solid var(--line, #2a2a30); }',
     '.snd-row:hover { background: var(--surface-2, #1c1c20); }',
-    '.snd-row.is-off .snd-rowmain { opacity: 0.6; }',
+    // 0.85 keeps the dim cue on off rows while the 13px meta text still
+    // clears 4.5:1 contrast (axe color-contrast)
+    '.snd-row.is-off .snd-rowmain { opacity: 0.85; }',
     '.snd-rowmain { flex: 1 1 200px; min-width: 0; }',
     '.snd-rowname {',
     '  display: block; background: none; border: 0; padding: 0; margin: 0;',

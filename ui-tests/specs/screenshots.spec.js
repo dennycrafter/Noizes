@@ -31,8 +31,8 @@ test.describe('screenshots', () => {
       const page = await context.newPage();
       await open(page);
       await gotoPage(page, 'connections');
-      await page.getByRole('button', { name: 'Edit', exact: true }).click();
-      await expect(page.locator('.panel')).toBeVisible();
+      await page.getByRole('button', { name: 'Edit GitHub settings' }).click();
+      await expect(page.locator('.nz-panel')).toBeVisible();
       await page.waitForTimeout(120);
       await page.screenshot({ path: `${SHOTS}/github-panel-${tag}.png` });
 

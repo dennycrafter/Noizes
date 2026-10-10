@@ -40,10 +40,10 @@ test.describe('switch roles and labels', () => {
 
   test('switches are keyboard operable with Space', async ({ page }) => {
     await open(page);
-    const sw = page.locator('[data-event="gh-push"] button[role="switch"]');
+    const sw = page.locator('[data-event-id="gh-push"] button[role="switch"]');
     await sw.focus();
     await page.keyboard.press('Space');
-    await expect(sw).toHaveAttribute('aria-checked', 'false'); // a focused button fires on Space
+    await expect(sw).toHaveAttribute('aria-checked', 'true'); // a focused button fires on Space
   });
 });
 
@@ -66,8 +66,8 @@ test.describe('axe-core', () => {
   test('no serious or critical issues with the GitHub panel open', async ({ page }) => {
     await open(page);
     await gotoPage(page, 'connections');
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
-    await expect(page.locator('.panel')).toBeVisible();
+    await page.getByRole('button', { name: 'Edit GitHub settings' }).click();
+    await expect(page.locator('.nz-panel')).toBeVisible();
     await injectAxe(page);
     const results = await page.evaluate(() => axe.run({ resultTypes: ['violations'] }));
     const bad = results.violations

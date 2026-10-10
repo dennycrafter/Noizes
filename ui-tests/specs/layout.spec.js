@@ -99,8 +99,8 @@ test.describe('text rules', () => {
   test('no dashes or double spaces in the GitHub panel either', async ({ page }) => {
     await open(page);
     await gotoPage(page, 'connections');
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
-    await expect(page.locator('.panel')).toBeVisible();
+    await page.getByRole('button', { name: 'Edit GitHub settings' }).click();
+    await expect(page.locator('.nz-panel')).toBeVisible();
     const bad = await textAudit(page);
     expect(bad).toEqual([]);
   });

@@ -315,7 +315,7 @@
       chromeOn ? statusPill('ok', 'Connected') : statusPill('', 'Not connected'),
       h('button', {
         class: 'nz-btn', type: 'button', text: 'How to add it',
-        'aria-label': 'How to add the Chrome extension',
+        'aria-label': 'How to add it - the Chrome extension',
         onclick: function () { openExtensionPanel(ctx); }
       })));
 

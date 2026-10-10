@@ -38,3 +38,8 @@ Per the brief: when the spec is silent, pick the simplest option that fits and l
 - The shell `api.openFolder(which)` wrapper now passes the which argument through (note 7); pages keep calling it via NZ.request, both paths carry which.
 - One state shape for v1.3.0: UiBridge.BuildState is the source of truth. Pages read it (with one-line fallbacks for the standalone dev stub path), and the Playwright mock mirrors it exactly, so the suite tests the production contract rather than a parallel one.
 - The Playwright suite targets the real UI at src/Noizes/ui (playwright.config.js already prefers it once it exists). The ui-tests/fixture stays only as the pre-shell bootstrap fallback and is no longer the spec target.
+- The off-row dim went from 0.6 to 0.85 opacity - 0.6 dropped the 13px meta text under 4.5:1 contrast (axe color-contrast, serious); 0.85 keeps the dim cue and passes on both the page and surface backgrounds.
+- The Chrome extension button's accessible name is now "How to add it - the Chrome extension" - the old name did not contain the visible text, which axe flags as label-content-name-mismatch (serious).
+- The Playwright mock's default volume is 40 on the integer 0-100 scale, matching EventConfig.Volume in production - the old 0.4 float came from the pre-lane fixture shape.
+- Mock story: two of four Browser events on (the mixed-group middle state) and both Deploys on (the all-on group switch case) - the group-switch tests need real mixed and all-on groups.
+- Spec selectors mapped to the real shell DOM: snd-row with data-event-id, snd-rowname/snd-detail, .snd-search, .nz-panel, #muteBtn and #mutedUntil - the fixtures' pre-shell names (.event-row, data-event, #search) no longer exist in the real page.

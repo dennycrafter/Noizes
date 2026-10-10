@@ -16,7 +16,7 @@ async function open(page, urlPath = '/') {
   await page.addInitScript({ path: MOCK });
   await page.goto(urlPath, { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.__noizesMock, null, { timeout: 10000 });
-  await page.waitForFunction(() => document.querySelectorAll('.event-row').length > 0, null, { timeout: 10000 });
+  await page.waitForFunction(() => document.querySelectorAll('.snd-row').length > 0, null, { timeout: 10000 });
   return page;
 }
 
@@ -31,7 +31,7 @@ function callsOf(all, type) {
 
 // Navigate with the sidebar. Side effect free re-render included in the fixture.
 async function gotoPage(page, name) {
-  await page.click(`.nav-item[data-page="${name}"]`);
+  await page.click(`.nz-nav-btn[data-page="${name}"]`);
   await page.waitForTimeout(50);
 }
 
