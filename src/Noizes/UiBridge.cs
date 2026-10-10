@@ -161,8 +161,11 @@ public static class UiBridge
                 break;
 
             case "openFolder":
-                Directory.CreateDirectory(AppConfig.Dir);
-                Process.Start(new ProcessStartInfo { FileName = AppConfig.Dir, UseShellExecute = true });
+                string folderToOpen = Str(msg, "which") == "extension"
+                    ? Path.Combine(AppContext.BaseDirectory, "extension")
+                    : AppConfig.Dir;
+                Directory.CreateDirectory(folderToOpen);
+                Process.Start(new ProcessStartInfo { FileName = folderToOpen, UseShellExecute = true });
                 PostReply(rawId, null);
                 break;
 
@@ -534,6 +537,21 @@ public static class UiBridge
             }).ToArray(),
             github = GithubState(),
             watcherEnabled = cfg.Features.ClaudeDesktopWatcher,
+            // one connections view for the Connections page rows and the Sounds page
+            // "not connected" lines. claudeCode and cursor are derived from the hook
+            // files Connect writes; chrome has no installed marker on disk yet, so it
+            // stays false until the extension announces itself.
+            connections = new
+            {
+                claudeCode = new { connected = File.Exists(ClaudeCodeConnector.SettingsPath) },
+                cursor = new { connected = File.Exists(CursorConnector.HooksPath) },
+                github = GithubState(),
+                claudeDesktop = new { enabled = cfg.Features.ClaudeDesktopWatcher },
+                chrome = new { connected = false },
+                chromeExtension = new { connected = false },
+                deploy = new { connected = true },
+                extras = new { connected = true }
+            },
             quiet = new { enabled = cfg.Quiet.Enabled, start = cfg.Quiet.Start, end = cfg.Quiet.End, allowAlarms = cfg.Quiet.AllowAlarms },
             uptimeUrls = cfg.UptimeUrls,
             countdown = new { enabled = cfg.Countdown.Enabled, targetLocal = cfg.Countdown.TargetLocal },

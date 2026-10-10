@@ -293,8 +293,13 @@
     }
     var keys = GROUP_CONNECTION_KEYS[String(groupName).toLowerCase()];
     if (!keys) return true;
+    function connOn(v) {
+      if (typeof v === 'boolean') return v;
+      if (v && typeof v === 'object') return !!(v.connected || v.enabled || v.tokenSet);
+      return undefined;
+    }
     var known = keys
-      .map(function (k) { return state.connections ? state.connections[k] : undefined; })
+      .map(function (k) { return state.connections ? connOn(state.connections[k]) : undefined; })
       .filter(function (v) { return typeof v === 'boolean'; });
     if (!known.length) return true; // unknown status: never nag the user
     return known.some(Boolean);
@@ -308,7 +313,8 @@
     if (raw.connections && typeof raw.connections === 'object') out.connections = raw.connections;
     if (raw.groupConnections && typeof raw.groupConnections === 'object') out.groupConnections = raw.groupConnections;
     var list = [];
-    if (Array.isArray(raw.events)) list = raw.events;
+    if (Array.isArray(raw.sounds)) list = raw.sounds;
+    else if (Array.isArray(raw.events)) list = raw.events;
     else if (raw.events && typeof raw.events === 'object') {
       Object.keys(raw.events).forEach(function (k) {
         list.push(Object.assign({ id: k }, raw.events[k]));

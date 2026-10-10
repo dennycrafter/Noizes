@@ -29,6 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the Chrome extension source ships with the app so "Open extension folder"
+         (openFolder which=extension) has a real folder to open -->
+    <None Include="..\..\extension\**\*.*" CopyToOutputDirectory="PreserveNewest" Link="extension\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- UI v2 (brief section 2): embed the settings page files from ui/. LogicalName keeps
          the folder slashes so SettingsWindow can extract them to real relative paths. -->
     <EmbeddedResource Include="ui\**\*">

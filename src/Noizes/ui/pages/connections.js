@@ -272,7 +272,9 @@
     ensureStyle();
     var st = ctx.state || {};
     var cn = st.connections || {};
-    var gh = cn.github || {};
+    // BuildState puts github at the top level and exposes the watcher as
+    // watcherEnabled; keep the connections.* fallback so the dev stub path works.
+    var gh = st.github || cn.github || {};
 
     var box = h('div', { class: 'nz-card' });
 
@@ -295,7 +297,7 @@
         onclick: function () { openGithubPanel(ctx, gh); }
       })));
 
-    var watcherOn = !!(cn.claudeDesktop && cn.claudeDesktop.enabled);
+    var watcherOn = !!(cn.claudeDesktop && cn.claudeDesktop.enabled) || st.watcherEnabled === true;
     box.appendChild(rowFor('Claude desktop app',
       'Plays a sound when the Claude desktop app finishes answering.',
       watcherOn ? statusPill('ok', 'Connected') : statusPill('', 'Not connected'),
