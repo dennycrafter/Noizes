@@ -17,6 +17,7 @@ public class SettingsForm : Form
     static readonly Color TextPrimary = Color.FromArgb(0xF2, 0xF4, 0xF8);   // near-white body text
     static readonly Color TextSecondary = Color.FromArgb(0x9A, 0xA3, 0xB5); // slate: hints and off states
     static readonly Color Accent = Color.FromArgb(0x0A, 0x84, 0xFF);        // victory blue: selection + actions
+    static readonly Color Gold = Color.FromArgb(0xFF, 0xC8, 0x00);          // the one gold Save
     static readonly Color OnGreen = Color.FromArgb(0x39, 0xD3, 0x53);       // "on" everywhere
     // same hue as the page, lifted so inputs read as fields - not a new palette color
     static readonly Color FieldBack = Color.FromArgb(0x1D, 0x21, 0x2D);
@@ -97,6 +98,13 @@ public class SettingsForm : Form
         tabs.TabPages.Add(BuildExtrasTab());
         foreach (TabPage page in tabs.TabPages) { page.BackColor = PageBack; page.ForeColor = TextPrimary; }
         tabs.BackColor = PageBack; // kill the light strip around the pages
+
+        // S2: one button recipe everywhere - victory-blue actions, outline Close,
+        // and exactly one gold control in the window (the Save settings button)
+        foreach (var b in new[] { _btnClaude, _btnCursor, _btnGhReveal, _btnWatcher, _btnChromeHow,
+                                  _btnExtrasGo, _btnBrowse, _btnDefault, _btnTest, _btnSaveGh, _btnTestGh })
+            StylePrimary(b);
+
         _tabs.SelectedIndexChanged += (s, e) =>
         {
             StyleSelection(); // keep the accent on the selected row
@@ -109,8 +117,10 @@ public class SettingsForm : Form
             FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8)
         };
         var btnClose = new Button { Text = "Close", TabIndex = 1 };
+        StyleSecondary(btnClose); // the outline recipe: secondary actions don't shout
         btnClose.Click += (s, e) => Close();
         var btnSave = new Button { Text = "Save settings", TabIndex = 0 };
+        StyleGold(btnSave); // the one gold control in the window
         btnSave.Click += (s, e) => SaveAll();
         bottom.Controls.Add(btnClose);
         bottom.Controls.Add(btnSave);
@@ -535,6 +545,40 @@ public class SettingsForm : Form
         item.SubItems[1].Font = ec.Enabled ? _boldFont : _list.Font; // reset font so a row turned Off isn't left bold
         item.SubItems[2].Text = ec.Volume + "%";
         item.SubItems[3].Text = string.IsNullOrEmpty(ec.SoundPath) ? "(default)" : Path.GetFileName(ec.SoundPath);
+    }
+
+    /// <summary>S2: flat victory-blue action buttons - white text, hover darker, all standard properties.</summary>
+    static void StylePrimary(Button b)
+    {
+        b.FlatStyle = FlatStyle.Flat;
+        b.BackColor = Accent;
+        b.ForeColor = Color.White;
+        b.FlatAppearance.BorderSize = 0;
+        b.FlatAppearance.MouseOverBackColor = ControlPaint.Dark(Accent); // same hue, darker
+        b.FlatAppearance.MouseDownBackColor = ControlPaint.DarkDark(Accent);
+    }
+
+    /// <summary>S2: the secondary recipe - blue outline on the page color, for Close and quiet controls.</summary>
+    static void StyleSecondary(Button b)
+    {
+        b.FlatStyle = FlatStyle.Flat;
+        b.BackColor = PageBack;
+        b.ForeColor = TextPrimary;
+        b.FlatAppearance.BorderSize = 1;
+        b.FlatAppearance.BorderColor = Accent;
+        b.FlatAppearance.MouseOverBackColor = FieldBack; // a nudge, not a flash
+        b.FlatAppearance.MouseDownBackColor = FieldBack;
+    }
+
+    /// <summary>S2: gold with near-black text - reserved for the bottom-bar Save settings.</summary>
+    static void StyleGold(Button b)
+    {
+        b.FlatStyle = FlatStyle.Flat;
+        b.BackColor = Gold;
+        b.ForeColor = PageBack;
+        b.FlatAppearance.BorderSize = 0;
+        b.FlatAppearance.MouseOverBackColor = ControlPaint.Dark(Gold); // same hue, darker
+        b.FlatAppearance.MouseDownBackColor = ControlPaint.DarkDark(Gold);
     }
 
     /// <summary>One accent blue for selection: per-item colors replace the system highlight on the dark list.</summary>
