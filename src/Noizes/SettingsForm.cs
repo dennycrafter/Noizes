@@ -19,7 +19,7 @@ public class SettingsForm : Form
     readonly Label _lblVol = new() { Width = 44, TextAlign = ContentAlignment.MiddleLeft }; // text always comes from the event's real volume
     readonly TextBox _txtSound = new() { ReadOnly = true, Width = 280 };
     readonly TextBox _txtFocusApps = new() { Width = 300 };
-    readonly Button _btnBrowse = new() { Text = "Choose sound..." };
+    readonly Button _btnBrowse = new() { Text = "Choose sound…" };
     readonly Button _btnDefault = new() { Text = "Use default" };
     readonly Button _btnTest = new() { Text = "Test" };
     string _currentEvent = "";
@@ -71,7 +71,11 @@ public class SettingsForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9f);
 
-        var tabs = _tabs = new TabControl { Dock = DockStyle.Fill };
+        // real icon in the title bar - same extraction the tray uses (csproj embeds the app icon)
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application; }
+        catch { Icon = SystemIcons.Application; }
+
+        var tabs = _tabs = new TabControl { Dock = DockStyle.Fill, TabIndex = 0 };
         _boldFont = new Font(Font, FontStyle.Bold);
         Disposed += (s, e) => _boldFont.Dispose();
 
@@ -86,18 +90,21 @@ public class SettingsForm : Form
 
         var bottom = new FlowLayoutPanel
         {
-            Dock = DockStyle.Bottom, Height = 46,
+            Dock = DockStyle.Bottom, AutoSize = true, TabIndex = 1,
             FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8)
         };
-        var btnClose = new Button { Text = "Close" };
+        var btnClose = new Button { Text = "Close", TabIndex = 1 };
         btnClose.Click += (s, e) => Close();
-        var btnSave = new Button { Text = "Save settings" };
+        var btnSave = new Button { Text = "Save settings", TabIndex = 0 };
         btnSave.Click += (s, e) => SaveAll();
         bottom.Controls.Add(btnClose);
         bottom.Controls.Add(btnSave);
 
         Controls.Add(_tabs);
         Controls.Add(bottom);
+
+        AcceptButton = btnSave; // Enter saves
+        CancelButton = btnClose; // Esc closes
 
         LoadAll();
     }
@@ -109,32 +116,47 @@ public class SettingsForm : Form
         _list.View = View.Details;
         _list.FullRowSelect = true;
         _list.HideSelection = false;
-        _list.Columns.Add("Event", 310);
-        _list.Columns.Add("On/Off", 70);
-        _list.Columns.Add("Volume", 70);
-        _list.Columns.Add("Sound", 260);
+        _list.Columns.Add("Event", 300);
+        _list.Columns.Add("On/Off", 60);
+        _list.Columns.Add("Volume", 60);
+        _list.Columns.Add("Sound", 240);
         _list.Dock = DockStyle.Fill;
+        _list.TabIndex = 0;
+        _list.ShowGroups = true;
+        var groups = new Dictionary<string, ListViewGroup>();
         foreach (var def in EventRegistry.All)
         {
-            var item = new ListViewItem(new[] { def.DisplayName, "", "", "" });
-            item.Tag = def.Id;
+            // first row in a category creates its group; groups render in registry order
+            if (!groups.TryGetValue(def.Category, out var group))
+            {
+                group = new ListViewGroup(def.Category);
+                groups[def.Category] = group;
+                _list.Groups.Add(group);
+            }
+            var item = new ListViewItem(new[] { def.DisplayName, "", "", "" }) { Tag = def.Id, Group = group };
             _list.Items.Add(item);
             StyleEventRow(item);
         }
         _list.SelectedIndexChanged += (s, e) => LoadSelectedEvent();
 
-        var detail = new GroupBox { Text = "Selected event", Dock = DockStyle.Bottom, Height = 200, Padding = new Padding(10) };
+        var detail = new GroupBox { Text = "Selected event", Dock = DockStyle.Bottom, AutoSize = true, TabIndex = 1, Padding = new Padding(10) };
         var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
         grid.Controls.Add(new Label { Text = "Enabled:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 0);
+        _chkEnabled.TabIndex = 0;
         grid.Controls.Add(_chkEnabled, 1, 0);
         grid.Controls.Add(new Label { Text = "Volume:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 1);
-        var volPanel = new FlowLayoutPanel { AutoSize = true, Height = 36, Width = 320 };
+        var volPanel = new FlowLayoutPanel { AutoSize = true, Width = 320, TabIndex = 1 };
+        _vol.TabIndex = 0;
         volPanel.Controls.Add(_vol);
         volPanel.Controls.Add(_lblVol);
         _vol.Scroll += (s, e) => RefreshVolumeLabel();
         grid.Controls.Add(volPanel, 1, 1);
         grid.Controls.Add(new Label { Text = "Sound:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 2);
-        var soundPanel = new FlowLayoutPanel { AutoSize = true, Height = 36, Width = 600 };
+        var soundPanel = new FlowLayoutPanel { AutoSize = true, Width = 600, TabIndex = 2 };
+        _txtSound.TabIndex = 0;
+        _btnBrowse.TabIndex = 1;
+        _btnDefault.TabIndex = 2;
+        _btnTest.TabIndex = 3;
         soundPanel.Controls.Add(_txtSound);
         soundPanel.Controls.Add(_btnBrowse);
         soundPanel.Controls.Add(_btnDefault);
@@ -147,6 +169,7 @@ public class SettingsForm : Form
         };
         grid.Controls.Add(focusHint, 0, 3);
         grid.SetColumnSpan(focusHint, 2);
+        _txtFocusApps.TabIndex = 3;
         grid.Controls.Add(_txtFocusApps, 1, 4);
         detail.Controls.Add(grid);
 
@@ -168,24 +191,35 @@ public class SettingsForm : Form
             AutoSize = true, Padding = new Padding(12), WrapContents = false
         };
 
+        _chkStartup.TabIndex = 0;
         panel.Controls.Add(_chkStartup);
+        _chkUnfocused.TabIndex = 1;
         panel.Controls.Add(_chkUnfocused);
 
-        var portPanel = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 640 };
-        portPanel.Controls.Add(new Label { Text = "Local server port:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var portPanel = new FlowLayoutPanel { AutoSize = true, Width = 640, TabIndex = 2 };
+        portPanel.Controls.Add(new Label { Text = "Local server port:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _numPort.TabIndex = 0;
         portPanel.Controls.Add(_numPort);
-        portPanel.Controls.Add(new Label { Text = "  (hooks call http://127.0.0.1:<port>/event/...)", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        portPanel.Controls.Add(new Label { Text = "(hooks call http://127.0.0.1:<port>/event/...)", AutoSize = true, Margin = new Padding(12, 8, 3, 0) });
         panel.Controls.Add(portPanel);
 
-        panel.Controls.Add(new Label { Text = "Quiet hours:", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
-        panel.Controls.Add(_chkQuiet);
-        var quietPanel = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 640, Padding = new Padding(24, 0, 0, 0) };
-        quietPanel.Controls.Add(new Label { Text = "From", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        quietPanel.Controls.Add(_txtQuietStart);
-        quietPanel.Controls.Add(new Label { Text = "to", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        quietPanel.Controls.Add(_txtQuietEnd);
-        quietPanel.Controls.Add(new Label { Text = "(24-hour HH:MM, e.g. 22:00 and 07:00)", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
-        panel.Controls.Add(quietPanel);
+        // a real GroupBox like the Extras tab, so quiet hours reads as one grouped setting
+        var quietGroup = new GroupBox { Text = "Quiet hours", AutoSize = true, Width = 700, TabIndex = 3, Padding = new Padding(10) };
+        var quietPanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
+        _chkQuiet.TabIndex = 0;
+        quietPanel.Controls.Add(_chkQuiet);
+        var quietTimes = new FlowLayoutPanel { AutoSize = true, Width = 640, TabIndex = 1 };
+        quietTimes.Controls.Add(new Label { Text = "from", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _txtQuietStart.TabIndex = 0;
+        quietTimes.Controls.Add(_txtQuietStart);
+        quietTimes.Controls.Add(new Label { Text = "to", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _txtQuietEnd.TabIndex = 1;
+        quietTimes.Controls.Add(_txtQuietEnd);
+        quietTimes.Controls.Add(new Label { Text = "(24-hour HH:MM, e.g. 22:00 and 07:00)", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        quietPanel.Controls.Add(quietTimes);
+        quietGroup.Controls.Add(quietPanel);
+        panel.Controls.Add(quietGroup);
+        _chkAllowAlarms.TabIndex = 4;
         panel.Controls.Add(_chkAllowAlarms);
 
         page.Controls.Add(panel);
@@ -200,27 +234,27 @@ public class SettingsForm : Form
         var panel = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown,
-            AutoScroll = true, Padding = new Padding(12), WrapContents = false
+            AutoScroll = true, Padding = new Padding(12), WrapContents = false, TabIndex = 0
         };
 
         panel.Controls.Add(IntegrationRow("Claude Code",
             "Adds the \"finished\" and \"needs your input\" hooks to ~/.claude/settings.json. Your file is backed up first and nothing already in it is removed. Open a NEW Claude Code session afterwards.",
-            "claude", _btnClaude));
+            "claude", _btnClaude, 0));
         panel.Controls.Add(IntegrationRow("Cursor",
             "Adds an agent \"stop\" hook to ~/.cursor/hooks.json. Your file is backed up first and nothing already in it is removed. Restart Cursor afterwards.",
-            "cursor", _btnCursor));
+            "cursor", _btnCursor, 1));
         panel.Controls.Add(IntegrationRow("GitHub activity",
             "Sounds for pushes, PRs, failed checks, stars, issues and comments on your account. Your token stays on this computer and is only sent to api.github.com.",
-            "github", _btnGhReveal));
+            "github", _btnGhReveal, 2));
         panel.Controls.Add(IntegrationRow("Claude desktop app",
             "Watches the desktop app's Stop button and plays a sound when a response finishes. Off by default - nothing is watched until you turn it on.",
-            "watcher", _btnWatcher));
+            "watcher", _btnWatcher, 3));
         panel.Controls.Add(IntegrationRow("Chrome extension",
             "Sounds for finished claude.ai and Obvious chats, watched tabs and downloads in Chrome. Loaded from chrome://extensions - no store needed.",
-            "chrome", _btnChromeHow));
+            "chrome", _btnChromeHow, 4));
         panel.Controls.Add(IntegrationRow("Uptime watch, countdown & long commands",
             "Uptime checks and the countdown are configured on the Uptime & countdown tab. Long commands play a sound when you run them through 'noizes run' in a terminal.",
-            "extras", _btnExtrasGo));
+            "extras", _btnExtrasGo, 5));
 
         _btnClaude.Click += (s, e) => { ConnectClaude(); RefreshIntegrationStatuses(); };
         _btnCursor.Click += (s, e) => { ConnectCursor(); RefreshIntegrationStatuses(); };
@@ -239,15 +273,16 @@ public class SettingsForm : Form
 
         page.Controls.Add(panel);
         page.Controls.Add(BuildGitHubPanel());
+        _ghPanel.TabIndex = 1; // after the rows panel
         RefreshIntegrationStatuses();
         return page;
     }
 
-    Control IntegrationRow(string title, string description, string statusKey, Button action)
+    Control IntegrationRow(string title, string description, string statusKey, Button action, int tabIndex)
     {
         var row = new FlowLayoutPanel
         {
-            AutoSize = true, Width = 712, WrapContents = false, Margin = new Padding(0, 4, 0, 8)
+            AutoSize = true, Width = 712, WrapContents = false, Margin = new Padding(0, 4, 0, 8), TabIndex = tabIndex
         };
 
         var nameCol = new FlowLayoutPanel
@@ -274,6 +309,7 @@ public class SettingsForm : Form
         _integStatus[statusKey] = status;
         row.Controls.Add(status);
         action.Margin = new Padding(8, 3, 3, 3);
+        action.TabIndex = 0; // the row's single focusable control
         row.Controls.Add(action);
         return row;
     }
@@ -292,32 +328,37 @@ public class SettingsForm : Form
 
         p.Controls.Add(new Label
         {
-            Text = "Create a read-only token: github.com/settings/personal-access-tokens -> Generate new token -> fine-grained -> Public repositories (read-only), no extra permissions.",
+            Text = "Create a read-only token: github.com/settings/personal-access-tokens → Generate new token → fine-grained → Public repositories (read-only), no extra permissions.",
             AutoSize = true, MaximumSize = new Size(650, 0), ForeColor = Color.FromArgb(96, 96, 96)
         });
 
-        var tokRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
-        tokRow.Controls.Add(new Label { Text = "Token:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var tokRow = new FlowLayoutPanel { AutoSize = true, Width = 660, TabIndex = 0 };
+        tokRow.Controls.Add(new Label { Text = "Token:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _txtToken.TabIndex = 0;
         tokRow.Controls.Add(_txtToken);
         p.Controls.Add(tokRow);
 
-        var userRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
-        userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var userRow = new FlowLayoutPanel { AutoSize = true, Width = 660, TabIndex = 1 };
+        userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _txtUser.TabIndex = 0;
         userRow.Controls.Add(_txtUser);
         p.Controls.Add(userRow);
 
-        var pollRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
-        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var pollRow = new FlowLayoutPanel { AutoSize = true, Width = 660, TabIndex = 2 };
+        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _numPoll.TabIndex = 0;
         pollRow.Controls.Add(_numPoll);
         pollRow.Controls.Add(new Label
         {
             Text = "seconds (5-300). Each check is lightweight: if nothing new, GitHub answers with an empty 304.",
-            AutoSize = true, Margin = new Padding(3, 9, 3, 0)
+            AutoSize = true, Margin = new Padding(3, 8, 3, 0)
         });
         p.Controls.Add(pollRow);
 
-        var btnRow = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 660 };
+        var btnRow = new FlowLayoutPanel { AutoSize = true, Width = 660, TabIndex = 3 };
+        _btnSaveGh.TabIndex = 0;
         btnRow.Controls.Add(_btnSaveGh);
+        _btnTestGh.TabIndex = 1;
         btnRow.Controls.Add(_btnTestGh);
         btnRow.Controls.Add(_lblGhStatus);
         p.Controls.Add(btnRow);
@@ -397,22 +438,25 @@ public class SettingsForm : Form
             AutoSize = true, Padding = new Padding(12), WrapContents = false
         };
 
-        var g1 = new GroupBox { Text = "Uptime watch", AutoSize = true, Width = 700, Padding = new Padding(10) };
-        var g1p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
+        var g1 = new GroupBox { Text = "Uptime watch", AutoSize = true, Width = 700, TabIndex = 0, Padding = new Padding(10) };
+        var g1p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false, TabIndex = 0 };
         g1p.Controls.Add(new Label
         {
             Text = "One URL per line. Each URL is checked every 3 minutes; if one fails twice in a row, the\n\"Uptime: a site is down\" alarm plays (even during quiet hours unless you say otherwise).",
             AutoSize = true, Width = 650
         });
         _txtUrls.Width = 650;
+        _txtUrls.TabIndex = 0;
         g1p.Controls.Add(_txtUrls);
         g1.Controls.Add(g1p);
 
-        var g2 = new GroupBox { Text = "Countdown", AutoSize = true, Width = 700, Padding = new Padding(10) };
+        var g2 = new GroupBox { Text = "Countdown", AutoSize = true, Width = 700, TabIndex = 1, Padding = new Padding(10) };
         var g2p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
+        _chkCountdown.TabIndex = 0;
         g2p.Controls.Add(_chkCountdown);
-        var dtpRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
-        dtpRow.Controls.Add(new Label { Text = "Target date & time:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var dtpRow = new FlowLayoutPanel { AutoSize = true, Width = 650, TabIndex = 1 };
+        dtpRow.Controls.Add(new Label { Text = "Target date & time:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        _dtp.TabIndex = 0;
         dtpRow.Controls.Add(_dtp);
         g2p.Controls.Add(dtpRow);
         g2.Controls.Add(g2p);
@@ -525,7 +569,7 @@ public class SettingsForm : Form
     {
         ApplyGitHub();
         _btnTestGh.Enabled = false;
-        _lblGhStatus.Text = "Testing...";
+        _lblGhStatus.Text = "Testing…";
         try
         {
             using var http = new HttpClient();
@@ -619,7 +663,7 @@ public class SettingsForm : Form
         var hint = new Label
         {
             Text = "Everything is off by default - connect an integration on this tab to hear your first sound.",
-            Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.MiddleLeft,
+            Dock = DockStyle.Top, AutoSize = true, TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(10, 8, 0, 0)
         };
         _tabs.TabPages[0].Controls.Add(hint);

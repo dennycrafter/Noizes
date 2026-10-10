@@ -1,5 +1,5 @@
 # Noizes helper.
-# Usage:  noizes setup                (one-command setup: hooks + the four core events; safe to run twice)
+# Usage:  noizes setup                (wire Claude Code + Cursor hooks and turn on the four core events; safe to run twice)
 #         noizes run <command...>     (plays a sound if the command took > 30 seconds)
 #         noizes test [eventId]       (plays a sound now; defaults to long-command-done)
 $ErrorActionPreference = 'Continue'
@@ -20,7 +20,7 @@ function Send-Event([string]$id) {
 }
 
 if ($args.Count -eq 0) {
-    Write-Host "Usage: noizes setup                  (wire Claude Code + Cursor hooks and turn on the core events)"
+    Write-Host "Usage: noizes setup                  (wire Claude Code + Cursor hooks and turn on the four core events; safe to run twice)"
     Write-Host "       noizes run <command...>       (sound when the command takes over 30 seconds)"
     Write-Host "       noizes test [eventId]         (play an event's sound now)"
     exit 2
@@ -45,7 +45,20 @@ if ($args[0] -eq 'setup') {
 }
 
 if ($args[0] -eq 'test') {
-    if ($args.Count -gt 1) { Send-Event $args[1] } else { Send-Event 'long-command-done' }
+    # one [noizes] result line: event id, port, HTTP result - silence is no longer an outcome
+    $eventId = if ($args.Count -gt 1) { $args[1] } else { 'long-command-done' }
+    try {
+        $resp = Invoke-WebRequest -Method Post -Uri ("http://127.0.0.1:{0}/event/{1}" -f $apiPort, $eventId) -TimeoutSec 2 -UseBasicParsing
+        Write-Host ("[noizes] test: event '{0}' on port {1} - HTTP {2}, sound queued" -f $eventId, $apiPort, [int]$resp.StatusCode)
+    } catch {
+        $code = $null
+        try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+        if ($code) {
+            Write-Host ("[noizes] test: event '{0}' on port {1} - HTTP {2} - check the event id" -f $eventId, $apiPort, $code)
+        } else {
+            Write-Host ("[noizes] test: event '{0}' on port {1} - no answer ({2}) - is Noizes running?" -f $eventId, $apiPort, $_.Exception.Message)
+        }
+    }
     exit 0
 }
 
