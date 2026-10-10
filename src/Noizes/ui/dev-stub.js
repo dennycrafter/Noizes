@@ -15,6 +15,10 @@
 
   if (window.chrome && window.chrome.webview) return;
 
+  // evidence marker: the poll-failure dump reads this to tell a stolen bridge
+  // (stub installed) from a missing host object (never installed)
+  window.__noizesStubInstalled = true;
+
   var FRIENDLY_CLIP = {
     "01-chime.wav": "chime",
     "02-bell.wav": "bell",
