@@ -45,6 +45,7 @@
 
   var pages = {};
   var activePageId = null;
+  var activePageDestroy = null;
   var pageNeedsRender = true;
   var state = null;
   var reqId = 0;
@@ -129,7 +130,7 @@
     setUptime: function (urls) { return request({ type: "setUptime", urls: urls }); },
     setCountdown: function (fields) { return request(Object.assign({ type: "setCountdown" }, fields)); },
     openLog: function () { return request({ type: "openLog" }); },
-    openFolder: function () { return request({ type: "openFolder" }); },
+    openFolder: function (which) { return request({ type: "openFolder", which: which }); },
     openUrl: function (url) { return request({ type: "openUrl", url: url }); }
   };
 
@@ -452,7 +453,13 @@
       return;
     }
     try {
-      page.render(els.page, pageCtx());
+      /* A page may return a destroy function (unsubscribes listeners and
+         timers). Run it before any re-render so a page that has been swapped
+         out never keeps live listeners, then take the next one if given. */
+      if (typeof activePageDestroy === "function") activePageDestroy();
+      activePageDestroy = null;
+      var maybeDestroy = page.render(els.page, pageCtx());
+      if (typeof maybeDestroy === "function") activePageDestroy = maybeDestroy;
       pageNeedsRender = false;
     } catch (err) {
       console.error(err);

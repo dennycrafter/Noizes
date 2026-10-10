@@ -43,6 +43,47 @@
 })(typeof self !== 'undefined' ? self : this, function (root) {
   'use strict';
 
+  /* Shell contract adapter (lane D, pages/README.md). Inside the lane D shell
+     this module registers with NZ.registerPage like every other page, and the
+     shell api is adapted to the bridge shape it expects: send resolves with
+     reply data, onState forwards the shell's per-push update hook, navigate
+     moves the shell hash. The destroy function returned by render is handed
+     back so the shell unsubscribes listeners and timers on page switch. */
+  if (root.NZ && typeof root.NZ.registerPage === 'function') {
+    var nzDestroy = null;
+    var nzPush = null;
+    root.NZ.registerPage({
+      id: 'sounds',
+      render: function (container, ctx) {
+        nzPush = null;
+        var bridge = {
+          send: function (type, payload) {
+            var msg = Object.assign({ type: type }, payload || {});
+            return ctx.api.request(msg).then(function (reply) {
+              if (!reply || reply.ok !== true) {
+                throw new Error(reply && reply.error ? reply.error : 'The app did not answer this request.');
+              }
+              return reply.data;
+            });
+          },
+          onState: function (cb) {
+            nzPush = cb;
+            return function () { if (nzPush === cb) nzPush = null; };
+          },
+          navigate: function (page) { location.hash = '#' + page; }
+        };
+        nzDestroy = render(container, bridge);
+        return function () {
+          if (nzDestroy) { nzDestroy(); nzDestroy = null; }
+          nzPush = null;
+        };
+      },
+      update: function (state) {
+        if (nzPush) nzPush(state);
+      }
+    });
+  }
+
   var SVG_NS = 'http://www.w3.org/2000/svg';
 
   /* ------------------------------------------------------------------ *

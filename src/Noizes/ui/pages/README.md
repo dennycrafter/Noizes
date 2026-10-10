@@ -16,7 +16,9 @@ module registers one page with the shell:
     });
 
 - `render` runs when the page becomes active and must rebuild the page from
-  scratch. Do not keep references to elements from an earlier render.
+  scratch. Do not keep references to elements from an earlier render. It may
+  return a destroy function; the shell runs it before the next render (page
+  switch or refresh) so listeners and timers never outlive their DOM.
 - `update` runs on every pushed state while the page is active. Use it to refresh
   in place, so a search box keeps focus. Without `update`, the shell re-runs
   `render` on every push.
