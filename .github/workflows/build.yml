@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'tier-*'
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -43,6 +44,7 @@ jobs:
             tier-1) echo "version=0.1.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 1 - core (Claude Code hooks, Cursor hook, GitHub basics)" >> "$GITHUB_OUTPUT";;
             tier-2) echo "version=0.2.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 2 - Claude desktop app watcher + Chrome extension" >> "$GITHUB_OUTPUT";;
             tier-3) echo "version=0.3.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 3 - deploy statuses + GitHub stars/issues/comments" >> "$GITHUB_OUTPUT";;
+            v*)     echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"; echo "tier=all features" >> "$GITHUB_OUTPUT";;
             *)      echo "version=1.0.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 4 - uptime watch, long-command, countdown (all features)" >> "$GITHUB_OUTPUT";;
           esac
 
