@@ -71,6 +71,10 @@ public class SettingsForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9f);
 
+        // real icon in the title bar - same extraction the tray uses (csproj embeds the app icon)
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application; }
+        catch { Icon = SystemIcons.Application; }
+
         var tabs = _tabs = new TabControl { Dock = DockStyle.Fill };
         _boldFont = new Font(Font, FontStyle.Bold);
         Disposed += (s, e) => _boldFont.Dispose();
@@ -98,6 +102,9 @@ public class SettingsForm : Form
 
         Controls.Add(_tabs);
         Controls.Add(bottom);
+
+        AcceptButton = btnSave; // Enter saves
+        CancelButton = btnClose; // Esc closes
 
         LoadAll();
     }
