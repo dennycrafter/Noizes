@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, ui-v2 ]
   pull_request:
 
 jobs:
@@ -68,4 +68,49 @@ jobs:
             ui-tests/playwright-report/
             ui-tests/test-results/
             docs/screenshots/v1.3/
+
+  # v1.3.0 integration: the real settings window on windows-latest. The
+  # --screenshot-settings flag (brief section 7) opens the window at 100 and
+  # 150 percent scaling, saves PNGs and exits. Runs are uploaded as an artifact;
+  # on ui-v2 pushes the PNGs are also committed to the repo (with [skip ci] so
+  # the commit never re-triggers this workflow).
+  windows-screenshots:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build src/Noizes/Noizes.csproj -c Release
+
+      - name: Capture settings screenshots
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--screenshot-settings", "docs/screenshots/v1.3/windows" -Wait -PassThru
+          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          exit $p.ExitCode
+
+      - name: Upload screenshots artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
+          path: docs/screenshots/v1.3/windows/
+
+      - name: Commit screenshots to the repo
+        if: github.event_name == 'push' && github.ref == 'refs/heads/ui-v2'
+        shell: bash
+        run: |
+          git config user.name "obvious-ai[bot]"
+          git config user.email "obvious@obvious.ai"
+          git add docs/screenshots/v1.3/windows
+          if git diff --cached --quiet; then
+            echo "no screenshot changes to commit"
+          else
+            git commit -m "ci: settings window screenshots [skip ci]"
+            git push
+          fi
 
