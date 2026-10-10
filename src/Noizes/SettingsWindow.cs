@@ -196,6 +196,19 @@ public static class SettingsWindow
         {
             base.OnFormClosing(e);
             if (!_screenshot) WindowMemory.Save(this);
+            UiBridge.Detach(PostToPage); // a background push after close must not touch the old core
+        }
+
+        /// <summary>Posts bridge JSON to the page on the UI thread (the bridge contract:
+        /// background threads marshal before anything reaches the WebView2).</summary>
+        void PostToPage(string json)
+        {
+            try
+            {
+                if (InvokeRequired) { BeginInvoke(new Action(() => PostToPage(json))); return; }
+                _web.CoreWebView2?.PostWebMessageAsJson(json);
+            }
+            catch (Exception ex) { Logger.Info("bridge post to page failed: " + ex.Message); }
         }
 
         async void InitializeWebView()
@@ -232,6 +245,13 @@ public static class SettingsWindow
         void ConfigureWebview()
         {
             var core = _web.CoreWebView2;
+
+            // the window hosts the bridge by default: the page's getState request must be
+            // answered or it sits at "Loading settings." forever (nothing outside the
+            // self-test ever wired the host side, in the real app or in screenshot mode).
+            // OnWebViewReady stays as an extension point for hosts that need more.
+            core.WebMessageReceived += (s, e) => UiBridge.HandleMessage(e.TryGetWebMessageAsString());
+            UiBridge.Attach(PostToPage);
 
             // the ui folder is reachable only under https://noizes.ui (brief section 2)
             core.SetVirtualHostNameToFolderMapping(UiHost, UiDir, CoreWebView2HostResourceAccessKind.Allow);
