@@ -26,8 +26,9 @@ jobs:
         shell: pwsh
         run: |
           dotnet build src/Noizes/Noizes.csproj -c Release
-          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru
-          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru -RedirectStandardOutput "selftest-stdout.log" -RedirectStandardError "selftest-stderr.log"
+          if (Test-Path "selftest-stdout.log") { Get-Content "selftest-stdout.log" }
+          if (Test-Path "selftest-stderr.log") { Get-Content "selftest-stderr.log" }
           exit $p.ExitCode
 
       - name: Publish self-contained exe
@@ -67,6 +68,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Noizes ${{ steps.ver.outputs.version }} - ${{ steps.ver.outputs.tier }}
+          prerelease: ${{ steps.rel.outputs.prerelease }}
           body: |
             Installer: download **Noizes-${{ steps.ver.outputs.version }}-setup.exe** below and run it.
 

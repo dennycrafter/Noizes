@@ -12,3 +12,7 @@ What you (the owner or the fixer) must do:
 2. If the cause is the screen copy, land the code fix in `src/Noizes/SettingsWindow.cs` `SaveScreenshot` (UI-REVIEW.md fix 5): capture the WebView2 itself instead of copying the screen, because a runner without an interactive desktop can fail `CopyFromScreen`.
 
 This blocks the finisher: brief section 7 requires the Windows screenshots as a CI artifact and committed copies under `docs/screenshots/v1.3/windows/`, and the release gate expects CI green.
+
+### Update (finisher, same day)
+
+Fix landed on ui-v2: ci.yml now installs the WebView2 Runtime, redirects the exe's stdout and stderr in the capture and self-test steps (build.yml too), and SaveScreenshot falls back to capturing the WebView2 page itself when the desktop copy is unavailable. Verification pending; this entry gets its final status (with the CI run link) once the run completes.

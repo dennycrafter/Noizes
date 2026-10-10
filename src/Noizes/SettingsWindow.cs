@@ -327,18 +327,42 @@ public static class SettingsWindow
             if (_captured) return; // NavigationCompleted can fire once per navigation
             _captured = true;
             var settle = new System.Windows.Forms.Timer { Interval = 1200 }; // fonts and first paint after load
-            settle.Tick += (sender, e) =>
+            settle.Tick += async (sender, e) =>
             {
                 var t = (System.Windows.Forms.Timer)sender;
                 t.Stop();
                 t.Dispose();
-                SaveScreenshot();
+                await SaveScreenshotAsync();
                 Close();
             };
             settle.Start();
         }
 
-        void SaveScreenshot()
+        async Task SaveScreenshotAsync()
+        {
+            if (TryCaptureWindow())
+            {
+                Console.WriteLine("saved " + _shotPath);
+                return;
+            }
+            try
+            {
+                // CI runners can lack an interactive desktop, so the window shot (CopyFromScreen,
+                // title bar included) is best effort; the page itself always captures
+                using var ms = new MemoryStream();
+                await _web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, ms);
+                File.WriteAllBytes(_shotPath, ms.ToArray());
+                Console.WriteLine("saved " + _shotPath + " (page capture, no title bar)");
+            }
+            catch (Exception ex)
+            {
+                _runExitCode = 1;
+                Logger.Info("screenshot save failed: " + ex.Message);
+                Console.Error.WriteLine("screenshot save failed: " + ex.Message);
+            }
+        }
+
+        bool TryCaptureWindow()
         {
             try
             {
@@ -349,13 +373,13 @@ public static class SettingsWindow
                 using (var g = Graphics.FromImage(bmp))
                     g.CopyFromScreen(b.X, b.Y, 0, 0, new Size(b.Width, b.Height));
                 bmp.Save(_shotPath, System.Drawing.Imaging.ImageFormat.Png);
-                Console.WriteLine("saved " + _shotPath);
+                return true;
             }
             catch (Exception ex)
             {
-                _runExitCode = 1;
-                Logger.Info("screenshot save failed: " + ex.Message);
-                Console.Error.WriteLine("screenshot save failed: " + ex.Message);
+                Logger.Info("window capture unavailable: " + ex.Message);
+                Console.Error.WriteLine("window capture unavailable: " + ex.Message);
+                return false;
             }
         }
 

@@ -21,8 +21,9 @@ jobs:
       - name: Self-test
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru
-          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru -RedirectStandardOutput "selftest-stdout.log" -RedirectStandardError "selftest-stderr.log"
+          if (Test-Path "selftest-stdout.log") { Get-Content "selftest-stdout.log" }
+          if (Test-Path "selftest-stderr.log") { Get-Content "selftest-stderr.log" }
           exit $p.ExitCode
 
       - name: Publish self-contained exe
@@ -86,11 +87,17 @@ jobs:
       - name: Build
         run: dotnet build src/Noizes/Noizes.csproj -c Release
 
+      # the runner image ships Edge but not the WebView2 Runtime the settings window hosts
+      - name: Install the WebView2 runtime
+        shell: pwsh
+        run: choco install webview2-runtime -y --no-progress
+
       - name: Capture settings screenshots
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--screenshot-settings", "docs/screenshots/v1.3/windows" -Wait -PassThru
-          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--screenshot-settings", "docs/screenshots/v1.3/windows" -Wait -PassThru -RedirectStandardOutput "shot-stdout.log" -RedirectStandardError "shot-stderr.log"
+          if (Test-Path "shot-stdout.log") { Get-Content "shot-stdout.log" }
+          if (Test-Path "shot-stderr.log") { Get-Content "shot-stderr.log" }
           exit $p.ExitCode
 
       - name: Upload screenshots artifact
