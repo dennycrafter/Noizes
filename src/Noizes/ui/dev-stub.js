@@ -115,8 +115,9 @@
   var listeners = [];
   var state = buildState();
 
-  window.chrome = window.chrome || {};
-  window.chrome.webview = {
+  // shadow, never replace: window.chrome is a frozen host object inside
+  // WebView2, so the page looks for this demo bridge first
+  window.__noizesDemoWebview = {
     postMessage: function (msg) { handle(msg); },
     addEventListener: function (type, fn) {
       if (type === "message") listeners.push(fn);

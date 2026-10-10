@@ -59,6 +59,8 @@
   /* ----- Bridge ----- */
 
   function webview() {
+    // evidence and plain-browser runs: the demo bridge shadows the real one
+    if (window.__noizesDemoWebview) return window.__noizesDemoWebview;
     var wv = window.chrome && window.chrome.webview;
     return wv && typeof wv.postMessage === "function" ? wv : null;
   }
