@@ -90,7 +90,7 @@ public class SettingsForm : Form
 
         var bottom = new FlowLayoutPanel
         {
-            Dock = DockStyle.Bottom, Height = 46,
+            Dock = DockStyle.Bottom, AutoSize = true,
             FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8)
         };
         var btnClose = new Button { Text = "Close" };
@@ -116,10 +116,10 @@ public class SettingsForm : Form
         _list.View = View.Details;
         _list.FullRowSelect = true;
         _list.HideSelection = false;
-        _list.Columns.Add("Event", 310);
-        _list.Columns.Add("On/Off", 70);
-        _list.Columns.Add("Volume", 70);
-        _list.Columns.Add("Sound", 260);
+        _list.Columns.Add("Event", 300);
+        _list.Columns.Add("On/Off", 60);
+        _list.Columns.Add("Volume", 60);
+        _list.Columns.Add("Sound", 240);
         _list.Dock = DockStyle.Fill;
         foreach (var def in EventRegistry.All)
         {
@@ -130,18 +130,18 @@ public class SettingsForm : Form
         }
         _list.SelectedIndexChanged += (s, e) => LoadSelectedEvent();
 
-        var detail = new GroupBox { Text = "Selected event", Dock = DockStyle.Bottom, Height = 200, Padding = new Padding(10) };
+        var detail = new GroupBox { Text = "Selected event", Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(10) };
         var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
         grid.Controls.Add(new Label { Text = "Enabled:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 0);
         grid.Controls.Add(_chkEnabled, 1, 0);
         grid.Controls.Add(new Label { Text = "Volume:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 1);
-        var volPanel = new FlowLayoutPanel { AutoSize = true, Height = 36, Width = 320 };
+        var volPanel = new FlowLayoutPanel { AutoSize = true, Width = 320 };
         volPanel.Controls.Add(_vol);
         volPanel.Controls.Add(_lblVol);
         _vol.Scroll += (s, e) => RefreshVolumeLabel();
         grid.Controls.Add(volPanel, 1, 1);
         grid.Controls.Add(new Label { Text = "Sound:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 2);
-        var soundPanel = new FlowLayoutPanel { AutoSize = true, Height = 36, Width = 600 };
+        var soundPanel = new FlowLayoutPanel { AutoSize = true, Width = 600 };
         soundPanel.Controls.Add(_txtSound);
         soundPanel.Controls.Add(_btnBrowse);
         soundPanel.Controls.Add(_btnDefault);
@@ -178,20 +178,20 @@ public class SettingsForm : Form
         panel.Controls.Add(_chkStartup);
         panel.Controls.Add(_chkUnfocused);
 
-        var portPanel = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 640 };
-        portPanel.Controls.Add(new Label { Text = "Local server port:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var portPanel = new FlowLayoutPanel { AutoSize = true, Width = 640 };
+        portPanel.Controls.Add(new Label { Text = "Local server port:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         portPanel.Controls.Add(_numPort);
-        portPanel.Controls.Add(new Label { Text = "  (hooks call http://127.0.0.1:<port>/event/...)", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        portPanel.Controls.Add(new Label { Text = "  (hooks call http://127.0.0.1:<port>/event/...)", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         panel.Controls.Add(portPanel);
 
         panel.Controls.Add(new Label { Text = "Quiet hours:", AutoSize = true, Margin = new Padding(3, 6, 3, 0) });
         panel.Controls.Add(_chkQuiet);
-        var quietPanel = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 640, Padding = new Padding(24, 0, 0, 0) };
-        quietPanel.Controls.Add(new Label { Text = "From", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var quietPanel = new FlowLayoutPanel { AutoSize = true, Width = 640, Padding = new Padding(24, 0, 0, 0) };
+        quietPanel.Controls.Add(new Label { Text = "From", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         quietPanel.Controls.Add(_txtQuietStart);
-        quietPanel.Controls.Add(new Label { Text = "to", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        quietPanel.Controls.Add(new Label { Text = "to", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         quietPanel.Controls.Add(_txtQuietEnd);
-        quietPanel.Controls.Add(new Label { Text = "(24-hour HH:MM, e.g. 22:00 and 07:00)", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        quietPanel.Controls.Add(new Label { Text = "(24-hour HH:MM, e.g. 22:00 and 07:00)", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         panel.Controls.Add(quietPanel);
         panel.Controls.Add(_chkAllowAlarms);
 
@@ -303,27 +303,27 @@ public class SettingsForm : Form
             AutoSize = true, MaximumSize = new Size(650, 0), ForeColor = Color.FromArgb(96, 96, 96)
         });
 
-        var tokRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
-        tokRow.Controls.Add(new Label { Text = "Token:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var tokRow = new FlowLayoutPanel { AutoSize = true, Width = 660 };
+        tokRow.Controls.Add(new Label { Text = "Token:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         tokRow.Controls.Add(_txtToken);
         p.Controls.Add(tokRow);
 
-        var userRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
-        userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var userRow = new FlowLayoutPanel { AutoSize = true, Width = 660 };
+        userRow.Controls.Add(new Label { Text = "Username:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         userRow.Controls.Add(_txtUser);
         p.Controls.Add(userRow);
 
-        var pollRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 660 };
-        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var pollRow = new FlowLayoutPanel { AutoSize = true, Width = 660 };
+        pollRow.Controls.Add(new Label { Text = "Check every:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         pollRow.Controls.Add(_numPoll);
         pollRow.Controls.Add(new Label
         {
             Text = "seconds (5-300). Each check is lightweight: if nothing new, GitHub answers with an empty 304.",
-            AutoSize = true, Margin = new Padding(3, 9, 3, 0)
+            AutoSize = true, Margin = new Padding(3, 8, 3, 0)
         });
         p.Controls.Add(pollRow);
 
-        var btnRow = new FlowLayoutPanel { AutoSize = true, Height = 40, Width = 660 };
+        var btnRow = new FlowLayoutPanel { AutoSize = true, Width = 660 };
         btnRow.Controls.Add(_btnSaveGh);
         btnRow.Controls.Add(_btnTestGh);
         btnRow.Controls.Add(_lblGhStatus);
@@ -418,8 +418,8 @@ public class SettingsForm : Form
         var g2 = new GroupBox { Text = "Countdown", AutoSize = true, Width = 700, Padding = new Padding(10) };
         var g2p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
         g2p.Controls.Add(_chkCountdown);
-        var dtpRow = new FlowLayoutPanel { AutoSize = true, Height = 38, Width = 650 };
-        dtpRow.Controls.Add(new Label { Text = "Target date & time:", AutoSize = true, Margin = new Padding(3, 9, 3, 0) });
+        var dtpRow = new FlowLayoutPanel { AutoSize = true, Width = 650 };
+        dtpRow.Controls.Add(new Label { Text = "Target date & time:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         dtpRow.Controls.Add(_dtp);
         g2p.Controls.Add(dtpRow);
         g2.Controls.Add(g2p);
@@ -626,7 +626,7 @@ public class SettingsForm : Form
         var hint = new Label
         {
             Text = "Everything is off by default - connect an integration on this tab to hear your first sound.",
-            Dock = DockStyle.Top, Height = 30, TextAlign = ContentAlignment.MiddleLeft,
+            Dock = DockStyle.Top, AutoSize = true, TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(10, 8, 0, 0)
         };
         _tabs.TabPages[0].Controls.Add(hint);
