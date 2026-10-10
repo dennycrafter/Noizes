@@ -110,6 +110,29 @@ public static class SettingsWindow
     static string UiDir => Path.Combine(LocalDir, "ui");
     static string WebViewDir => Path.Combine(LocalDir, "WebView2");
 
+    // one environment per options signature, kept alive for the whole process: re-creating an
+    // environment over the same user data folder while the previous browser process is still
+    // tearing down loses the race with 0x8007139F ("not in the correct state"), which is how the
+    // second capture failed on the CI runner and how quickly reopening settings used to fail
+    static CoreWebView2Environment _sharedEnv;
+    static string _sharedEnvKey = "";
+
+    internal static async Task<CoreWebView2Environment> GetEnvironmentAsync(double forceScale)
+    {
+        string key = forceScale.ToString(CultureInfo.InvariantCulture);
+        if (_sharedEnv != null && _sharedEnvKey == key) return _sharedEnv;
+
+        var options = new CoreWebView2EnvironmentOptions();
+        if (forceScale > 1.0)
+            options.AdditionalBrowserArguments =
+                "--force-device-scale-factor=" + forceScale.ToString(CultureInfo.InvariantCulture);
+        // distinct user data folder per options key so two environments never fight over one folder
+        string udf = forceScale > 1.0 ? WebViewDir + "-" + key : WebViewDir;
+        _sharedEnv = await CoreWebView2Environment.CreateAsync(null, udf, options);
+        _sharedEnvKey = key;
+        return _sharedEnv;
+    }
+
     private sealed class SettingsWindowForm : Form
     {
         readonly WebView2 _web;
@@ -180,11 +203,7 @@ public static class SettingsWindow
             try
             {
                 ExtractUiAssets();
-                var options = new CoreWebView2EnvironmentOptions();
-                if (_forceScale > 1.0)
-                    options.AdditionalBrowserArguments =
-                        "--force-device-scale-factor=" + _forceScale.ToString(CultureInfo.InvariantCulture);
-                var env = await CoreWebView2Environment.CreateAsync(null, WebViewDir, options);
+                var env = await GetEnvironmentAsync(_forceScale);
                 await _web.EnsureCoreWebView2Async(env);
                 ConfigureWebview();
                 _web.CoreWebView2.Navigate("https://" + UiHost + "/index.html");
@@ -326,16 +345,30 @@ public static class SettingsWindow
         {
             if (_captured) return; // NavigationCompleted can fire once per navigation
             _captured = true;
-            var settle = new System.Windows.Forms.Timer { Interval = 1200 }; // fonts and first paint after load
-            settle.Tick += async (sender, e) =>
+            // wait for real content, not just first paint: the bridge pushes state after
+            // NavigationCompleted, so a fixed settle captured "Loading settings." on the runner
+            var poll = new System.Windows.Forms.Timer { Interval = 250 };
+            int tries = 0;
+            poll.Tick += async (sender, e) =>
             {
                 var t = (System.Windows.Forms.Timer)sender;
+                tries++;
+                bool ready = false;
+                try
+                {
+                    if (_web.CoreWebView2 != null)
+                        ready = await _web.CoreWebView2.ExecuteScriptAsync(
+                            "document.querySelector('.snd-row') !== null") == "true";
+                }
+                catch (Exception ex) { Logger.Info("capture probe retry: " + ex.Message); }
+                if (!ready && tries < 40) return; // ~10s ceiling, then capture whatever is there
                 t.Stop();
                 t.Dispose();
+                await Task.Delay(400); // fonts and final paint after the rows arrive
                 await SaveScreenshotAsync();
                 Close();
             };
-            settle.Start();
+            poll.Start();
         }
 
         async Task SaveScreenshotAsync()
