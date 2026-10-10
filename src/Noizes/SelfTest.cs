@@ -630,6 +630,11 @@ public static class SelfTest
         var tabs = FindDescendant(form, c => c is TabControl) as TabControl;
         Check("form-constructs", form.Controls.Count > 0 && tabs != null && tabs.TabCount == 4,
             $"controls={form.Controls.Count} tabs={(tabs == null ? -1 : tabs.TabCount)}");
+        // every registry category must render as a group in the events list
+        var list = FindDescendant(form, c => c is ListView) as ListView;
+        var expectedGroups = EventRegistry.All.Select(d => d.Category).Distinct().Count();
+        Check("event-groups-render", list != null && list.Groups.Count == expectedGroups,
+            $"groups={(list == null ? -1 : list.Groups.Count)} expected={expectedGroups}");
     }
 
     static Control FindDescendant(Control root, Func<Control, bool> match)
