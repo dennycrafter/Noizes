@@ -68,6 +68,8 @@ public static class SettingsWindow
     {
         Directory.CreateDirectory(folder);
         int code = 0;
+        // evidence runs are headless: mirror the app log to stdout so CI shows it
+        Logger.Sink = Console.WriteLine;
         foreach (double scale in new[] { 1.0, 1.5 })
         {
             var f = new SettingsWindowForm(scale, true,
@@ -75,6 +77,7 @@ public static class SettingsWindow
             Application.Run(f);
             if (f.RunExitCode != 0) code = f.RunExitCode;
         }
+        Logger.Sink = null;
         return code;
     }
 
@@ -250,7 +253,12 @@ public static class SettingsWindow
             // answered or it sits at "Loading settings." forever (nothing outside the
             // self-test ever wired the host side, in the real app or in screenshot mode).
             // OnWebViewReady stays as an extension point for hosts that need more.
-            core.WebMessageReceived += (s, e) => UiBridge.HandleMessage(e.TryGetWebMessageAsString());
+            core.WebMessageReceived += (s, e) =>
+            {
+                var json = e.TryGetWebMessageAsString();
+                if (_screenshot) Logger.Info("bridge page said: " + json); // evidence runs narrate
+                UiBridge.HandleMessage(json);
+            };
             UiBridge.Attach(PostToPage);
 
             // the ui folder is reachable only under https://noizes.ui (brief section 2)
@@ -282,7 +290,13 @@ public static class SettingsWindow
             SettingsWindow.OnWebViewReady?.Invoke(core);
 
             if (_screenshot)
+            {
+                // collect page errors so a stuck capture can name its cause
+                core.AddScriptToExecuteOnDocumentCreatedAsync(
+                    "window.addEventListener('error',function(e){window.__noizesErrors=(window.__noizesErrors||[]).concat(e.message)});" +
+                    "window.addEventListener('unhandledrejection',function(e){window.__noizesErrors=(window.__noizesErrors||[]).concat(String(e.reason))});");
                 core.NavigationCompleted += (sender, e) => BeginSettleThenCapture();
+            }
         }
 
         // ---------- helpers ----------
@@ -384,6 +398,17 @@ public static class SettingsWindow
                 if (!ready && tries < 40) return; // ~10s ceiling, then capture whatever is there
                 t.Stop();
                 t.Dispose();
+                if (!ready)
+                {
+                    try
+                    {
+                        var dom = await _web.CoreWebView2.ExecuteScriptAsync(
+                            "JSON.stringify({errors:(window.__noizesErrors||[]).slice(0,5),body:document.body.innerHTML})");
+                        Console.WriteLine("capture poll gave up after ~10s without rows; page said: " +
+                            (dom.Length > 2000 ? dom.Substring(0, 2000) + "...(truncated)" : dom));
+                    }
+                    catch (Exception ex) { Console.WriteLine("dom dump failed: " + ex.Message); }
+                }
                 await Task.Delay(400); // fonts and final paint after the rows arrive
                 await SaveScreenshotAsync();
                 Close();
