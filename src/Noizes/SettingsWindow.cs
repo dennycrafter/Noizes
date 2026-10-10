@@ -221,6 +221,7 @@ public static class SettingsWindow
                 ExtractUiAssets();
                 var env = await GetEnvironmentAsync(_forceScale);
                 await _web.EnsureCoreWebView2Async(env);
+                if (_screenshot) Logger.Info("webview2 runtime: " + env.BrowserVersionString);
                 ConfigureWebview();
                 _web.CoreWebView2.Navigate("https://" + UiHost + "/index.html");
             }
@@ -265,6 +266,8 @@ public static class SettingsWindow
             core.SetVirtualHostNameToFolderMapping(UiHost, UiDir, CoreWebView2HostResourceAccessKind.Allow);
 
             CoreWebView2Settings s = core.Settings;
+            // web messaging is the whole bridge; do not trust the default
+            s.IsWebMessageEnabled = true;
 #if !DEBUG
             // release lockdown: no dev tools, no default right-click menu, no zoom, no status bar
             s.AreDevToolsEnabled = false;
@@ -273,6 +276,10 @@ public static class SettingsWindow
             s.AreBrowserAcceleratorKeysEnabled = false;
             s.IsStatusBarEnabled = false;
 #endif
+
+            // a dead browser or renderer process explains silent bridge loss
+            core.ProcessFailed += (s2, e2) =>
+                Logger.Info("webview2 process failed: " + e2.ProcessFailedKind);
 
             // links open in the default browser, never inside the window
             core.NewWindowRequested += (sender, e) =>
