@@ -1,49 +1,86 @@
-# Noizes
+<div align="center">
+  <img src="docs/banner.png" alt="#1 Noizes" width="820"/>
+  <p><em>When the work is done, you'll know.</em></p>
+  <p>
+    <a href="https://github.com/dennycrafter/Noizes/actions/workflows/build.yml"><img src="https://github.com/dennycrafter/Noizes/actions/workflows/build.yml/badge.svg" alt="build"/></a>
+    <a href="https://github.com/dennycrafter/Noizes/releases"><img src="https://img.shields.io/badge/latest-v1.1.0-blue" alt="release"/></a>
+    <img src="https://img.shields.io/badge/platform-Windows-blueviolet" alt="windows"/>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT"/></a>
+  </p>
+</div>
 
-Noizes plays a sound when your AI coding agents finish or need your input, when GitHub things happen, and more - so you can leave the tab and hear when it's your turn again. Windows tray app (.NET 8) + Chrome companion; free, open source, everything stays on your machine. Fresh installs are silent: nothing plays until you turn it on.
+# 🏆 Victory Royale
 
-## Set up in one command
+You put your coding agents in the game to grind for you. But a build that finishes silently is a win nobody heard — and you were on the other side of the map.
 
-1. Grab `Noizes-<version>-setup.exe` from [Releases](../../releases) and run it (unsigned, so click **More info → Run anyway**).
-2. From any terminal: `noizes setup`
+**Noizes is the horn.** A Windows tray app (plus a Chrome companion) that plays a sound when something actually happens:
 
-That's it. It connects Claude Code and Cursor (their config files are backed up first, nothing else is touched), turns on exactly four events at 40% volume (Claude Code done / needs input, Cursor agent done, long command done), and is safe to run twice. Restart Claude Code / Cursor so the hooks load.
+- 🤖 **Claude Code / Cursor / Obvious finish their work** — hook events hit a local HTTP endpoint and the sound plays
+- 🐙 **GitHub PRs merge or get pushed** — including merges by **other actors** (yes, `obvious[bot]` counts now)
+- 🚀 **Deployments succeed or fail** — poll results become noise, the useful kind
+- 🌐 **Monitored sites change / go down** — uptime checks with a configurable cadence
+- ⏬ **Downloads finish** and 👀 **watched tabs do something** — via the Chrome extension
+- ⏳ **Countdowns hit zero** — for the "rest is 20 seconds, go" crowd
 
-## Tell your AI agent instead
+Everything lands on `localhost:7351`, dispatches through the event bus, and comes out your speakers via NAudio. Focus awareness and quiet hours keep it polite; logging keeps it honest.
 
-Paste this into Claude Code, Cursor, or any agent - it can do the rest:
+<div align="center"><em>"A win is not a win until the horn plays."</em></div>
+
+## 🎒 Loot table
+
+| Rarity | Drop | What it does |
+|---|---|---|
+| 🟡 Legendary | `noizes setup` | One command. Zero prompts. Agent-runnable. Wires hooks, base events, config. Adds itself to PATH. |
+| 🟣 Epic | Integrations tab | Every integration's on/off in one place — the master surface, first thing you see. |
+| 🔵 Rare | GitHub repo feeds | Personal feed **plus** explicitly configured repos, deduped, ETag-cached, rate-limit cooldown. |
+| 🟢 Uncommon | Quiet hours | 22:00–07:00 by default, midnight-safe, alarms still allowed. |
+| ⚪ Common | Silent by default | Fresh install: every event **off** at 40% volume. No 3 AM jump scares. Your settings survive upgrades. |
+
+## 🎯 Kill feed
 
 ```
-Set up Noizes for me:
-1. Download the newest Noizes-*-setup.exe from https://github.com/dennycrafter/Noizes/releases
-2. Unblock-File .\Noizes-*-setup.exe   (unsigned installer; skips the SmartScreen prompt)
-3. Run .\Noizes-*-setup.exe /VERYSILENT /NORESTART
-4. Run `noizes setup`; it must print its steps and exit 0
-5. Restart Claude Code / Cursor so their hooks load
+[Noizes]  Claude Code finished the refactor        🔔   hook → done
+[Noizes]  obvious[bot] merged PR #42               🔔   repo feed (bots count now)
+[Noizes]  Deploy FAILED                            📯   poll result
+[Noizes]  quiet hours 22:00–07:00 — suppressed (2) 💤   alarms allowed
+[Noizes]  port 7351 taken — staying alive anyway   🛡️   tray balloon says hi
 ```
 
-## Turning things on and off
+And when a notification is suppressed, Noizes writes down **why** — skip-reason logging is part of the contract.
 
-Everything is off by default at 40% volume. Tray icon → Settings: per-tool setup on **Integrations** (first tab), sounds/volumes on **Events**, quiet hours on **General**. Every skipped event logs its reason to `%APPDATA%\Noizes\log.txt`.
+## ⌨️ Controls
 
-## GitHub activity (optional)
+| Input | Move |
+|---|---|
+| `noizes setup` | The whole lobby: hooks, base events, config — zero prompts |
+| `noizes run` | Drop in and start listening |
+| Tray right-click | Settings, pause, exit |
+| Settings → Events | Per-event sound, volume, focus rules |
+| Settings → Integrations | Master on/off, GitHub credentials + test, Claude desktop watcher |
 
-Paste a **read-only** fine-grained token (create at https://github.com/settings/personal-access-tokens, public repos read-only) plus your username in Settings. User-events poll every 10 s (5-300 configurable, cheap 304s when quiet); deploys every 3 minutes. GitHub's user-events feed can lag ~30-60 s behind reality server-side - Noizes sees activity the moment GitHub does; sub-second would need webhooks + a tunnel (out of scope).
+## 📦 Drop in
 
-## Chrome extension
+1. Grab `Noizes-1.1.0-setup.exe` from [Releases](https://github.com/dennycrafter/Noizes/releases/latest)
+2. Run it (Inno Setup, adds the CLI to PATH)
+3. `noizes setup` — or open Settings → Integrations and flip things on
 
-`chrome://extensions` → Developer mode → **Load unpacked** → select the `extension/` folder from this repo. Adds Claude/Obvious in the browser, watched tabs, and download sounds (off until enabled).
+No account, no cloud, no telemetry. Sounds come from localhost and your own speakers.
 
-## CLI
+## 🗺️ The map
 
-- `noizes setup` - hooks + the four core events; idempotent, agent-friendly
-- `noizes run <command...>` - sound if the command took over 30 seconds
-- `noizes test [eventId]` - play any event's sound now
+```
+hooks (Claude/Cursor) · Chrome extension · GitHub polling · deploy/uptime/countdown checks
+        └──────────────►  localhost:7351  ──►  event bus  ──►  NAudio  ──►  🔊
+```
 
-## Reference
+## 🤝 Squad
 
-Events post to `http://127.0.0.1:7351/event/<event-id>` (port configurable, localhost only). Config: `%APPDATA%\Noizes\config.json`; no telemetry. Headless: `Noizes.exe --setup` (what `noizes setup` runs) and `Noizes.exe --selftest` (writes `selftest.log`). Build: `dotnet build src/Noizes/Noizes.csproj -c Release`.
+- **.NET 8 WinForms** — the tray app
+- **NAudio** — the noise itself
+- **Chrome MV3** — the browser companion
+- **Inno Setup** — the installer
+- **Python stdlib** — generated every default sound and the icon (yes, really)
 
-## License
+## 📜 License
 
-MIT - see [LICENSE](LICENSE).
+MIT. Play responsibly.
