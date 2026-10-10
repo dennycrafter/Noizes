@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, ui-v2 ]
   pull_request:
 
 jobs:
@@ -21,8 +21,9 @@ jobs:
       - name: Self-test
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru
-          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru -RedirectStandardOutput "selftest-stdout.log" -RedirectStandardError "selftest-stderr.log"
+          if (Test-Path "selftest-stdout.log") { Get-Content "selftest-stdout.log" }
+          if (Test-Path "selftest-stderr.log") { Get-Content "selftest-stderr.log" }
           exit $p.ExitCode
 
       - name: Publish self-contained exe
@@ -34,3 +35,92 @@ jobs:
         run: |
           choco install innosetup -y --no-progress
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=0.0.0-ci installer/noizes.iss
+
+  # lane G: the v1.3.0 UI suite (Playwright over the WebView2 pages, contract
+  # mock in ui-tests/mock-bridge.js). Linux is enough: the suite never loads
+  # the C# side, so it runs before and after the UI lanes merge.
+  ui-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI suite
+        run: npx playwright test
+
+      - name: Upload report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-tests-report
+          path: |
+            ui-tests/playwright-report/
+            ui-tests/test-results/
+            docs/screenshots/v1.3/
+
+  # v1.3.0 integration: the real settings window on windows-latest. The
+  # --screenshot-settings flag (brief section 7) opens the window at 100 and
+  # 150 percent scaling, saves PNGs and exits. Runs are uploaded as an artifact;
+  # on ui-v2 pushes the PNGs are also committed to the repo (with [skip ci] so
+  # the commit never re-triggers this workflow).
+  windows-screenshots:
+    runs-on: windows-latest
+    # the screenshot commit step pushes the captured PNGs back to ui-v2
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build src/Noizes/Noizes.csproj -c Release
+
+      # the runner image ships Edge but not the WebView2 Runtime the settings window hosts
+      - name: Install the WebView2 runtime
+        shell: pwsh
+        run: choco install webview2-runtime -y --no-progress
+
+      - name: Capture settings screenshots
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--screenshot-settings", "docs/screenshots/v1.3/windows" -Wait -PassThru -RedirectStandardOutput "shot-stdout.log" -RedirectStandardError "shot-stderr.log"
+          if (Test-Path "shot-stdout.log") { Get-Content "shot-stdout.log" }
+          if (Test-Path "shot-stderr.log") { Get-Content "shot-stderr.log" }
+          exit $p.ExitCode
+
+      - name: Upload screenshots artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-screenshots
+          path: docs/screenshots/v1.3/windows/
+
+      - name: Commit screenshots to the repo
+        if: github.event_name == 'push' && github.ref == 'refs/heads/ui-v2'
+        shell: bash
+        run: |
+          git config user.name "obvious-ai[bot]"
+          git config user.email "obvious@obvious.ai"
+          git add docs/screenshots/v1.3/windows
+          if git diff --cached --quiet; then
+            echo "no screenshot changes to commit"
+          else
+            git commit -m "ci: settings window screenshots [skip ci]"
+            git push
+          fi
+

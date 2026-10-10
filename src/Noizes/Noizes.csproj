@@ -10,7 +10,7 @@
     <AssemblyName>Noizes</AssemblyName>
     <RootNamespace>Noizes</RootNamespace>
     <ApplicationIcon>..\..\assets\app.ico</ApplicationIcon>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
@@ -21,10 +21,25 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\..\assets\sounds\*.wav" CopyToOutputDirectory="PreserveNewest" Link="sounds\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the Chrome extension source ships with the app so "Open extension folder"
+         (openFolder which=extension) has a real folder to open -->
+    <None Include="..\..\extension\**\*.*" CopyToOutputDirectory="PreserveNewest" Link="extension\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- UI v2 (brief section 2): embed the settings page files from ui/. LogicalName keeps
+         the folder slashes so SettingsWindow can extract them to real relative paths. -->
+    <EmbeddedResource Include="ui\**\*">
+      <LogicalName>ui/$([System.String]::Copy('%(RecursiveDir)%(Filename)%(Extension)').Replace('\','/'))</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

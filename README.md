@@ -26,6 +26,12 @@ Everything lands on `localhost:7351`, dispatches through the event bus, and come
 
 <div align="center"><em>"A win is not a win until the horn plays."</em></div>
 
+## What's new in v1.3.0
+
+- **A brand new settings window.** Modern dark pages (Sounds, Connections, Schedule, General) in a native WebView2 window: crisp at 100% to 200% scaling, nothing cut off, and every change saves the moment you click it. No Save button anywhere.
+- **One big mute switch.** "Sounds off" sits in the header of every page, "Mute 1 hour" sits next to it, and Mute items sit at the top of the tray menu. The tray icon wears a slash while muted, so you always know.
+- **One-click toggles.** Every event row has its own switch on the right: one click turns that sound, or a whole group, on or off.
+
 ## 🎒 Loot table
 
 | Rarity | Drop | What it does |

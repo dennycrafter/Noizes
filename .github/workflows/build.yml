@@ -26,8 +26,9 @@ jobs:
         shell: pwsh
         run: |
           dotnet build src/Noizes/Noizes.csproj -c Release
-          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru
-          if (Test-Path "selftest.log") { Get-Content "selftest.log" }
+          $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--selftest" -Wait -PassThru -RedirectStandardOutput "selftest-stdout.log" -RedirectStandardError "selftest-stderr.log"
+          if (Test-Path "selftest-stdout.log") { Get-Content "selftest-stdout.log" }
+          if (Test-Path "selftest-stderr.log") { Get-Content "selftest-stderr.log" }
           exit $p.ExitCode
 
       - name: Publish self-contained exe
@@ -48,6 +49,16 @@ jobs:
             *)      echo "version=1.0.0" >> "$GITHUB_OUTPUT"; echo "tier=Tier 4 - uptime watch, long-command, countdown (all features)" >> "$GITHUB_OUTPUT";;
           esac
 
+      # a pre-release tag carries a dash (v1.3.0-beta.1); a stable tag never does
+      - name: Prerelease flag
+        id: rel
+        shell: bash
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-*) echo "prerelease=true"  >> "$GITHUB_OUTPUT";;
+            *)   echo "prerelease=false" >> "$GITHUB_OUTPUT";;
+          esac
+
       - name: Build installer
         shell: pwsh
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=${{ steps.ver.outputs.version }} installer/noizes.iss'
@@ -57,6 +68,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Noizes ${{ steps.ver.outputs.version }} - ${{ steps.ver.outputs.tier }}
+          prerelease: ${{ steps.rel.outputs.prerelease }}
           body: |
             Installer: download **Noizes-${{ steps.ver.outputs.version }}-setup.exe** below and run it.
 

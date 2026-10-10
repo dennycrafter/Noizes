@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Noizes</title>
+  <link rel="stylesheet" href="app.css">
+  <!-- Dev stub for plain browsers. It leaves window.chrome.webview alone when the
+       page runs inside the Noizes app, and fakes it everywhere else. -->
+  <script src="dev-stub.js"></script>
+</head>
+<body>
+  <div class="nz-app">
+    <nav class="nz-sidebar" aria-label="Sections">
+      <div class="nz-nav" id="nav"></div>
+      <div class="nz-sidebar-foot">
+        <div class="nz-version" id="version"></div>
+        <button type="button" class="nz-linkbtn" id="openLogBtn">Open log</button>
+      </div>
+    </nav>
+    <div class="nz-main">
+      <header class="nz-header">
+        <h1 class="nz-title" id="pageTitle">Sounds</h1>
+        <div class="nz-header-right">
+          <span id="masterLabel">Sounds</span>
+          <span class="nz-master-host" id="masterSwitchHost"></span>
+          <span class="nz-pill nz-pill-warn" id="mutedUntil" hidden></span>
+          <button type="button" class="nz-linkbtn" id="muteBtn">Mute 1 hour</button>
+        </div>
+      </header>
+      <main class="nz-page" id="page" tabindex="-1"></main>
+    </div>
+  </div>
+  <div class="nz-toasts" id="toasts" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+  <!-- Page modules, owned by the page lanes. See pages/README.md for the contract. -->
+  <script src="pages/sounds.js" defer></script>
+  <script src="pages/connections.js" defer></script>
+  <script src="pages/schedule.js" defer></script>
+  <script src="pages/general.js" defer></script>
+</body>
+</html>

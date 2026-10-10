@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<!--
+  TEST FIXTURE (lane G): minimal contract page for the ui-tests suite.
+  The real v1.3.0 UI lives in src/Noizes/ui (lanes D, E and F); the suite
+  prefers that folder and only falls back to this fixture while it does not
+  exist. Do not ship this fixture in the app.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="noizes-ui-source" content="fixture">
+<title>Noizes</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/></svg>
+      <span>Noizes</span>
+    </div>
+    <nav class="side-nav" aria-label="Pages">
+      <button class="nav-item" data-page="sounds" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3z" fill="currentColor"/></svg>
+        Sounds
+      </button>
+      <button class="nav-item" data-page="connections">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/></svg>
+        Connections
+      </button>
+      <button class="nav-item" data-page="schedule">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H3v18h18V2h-4V0h-2v2H9V2H7zm12 18H5V8h14z" fill="currentColor"/></svg>
+        Schedule
+      </button>
+      <button class="nav-item" data-page="general">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3h-4l-.3 2.9a7.6 7.6 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.6 7.6 0 0 0 1.7 1L11 21h4l.3-2.9a7.6 7.6 0 0 0 1.7-1l2.5 1 2-3.5zM13 15a3 3 0 1 1 3-3 3 3 0 0 1-3 3z" fill="currentColor"/></svg>
+        General
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="version" id="version">v1.3.0</span>
+      <button class="text-btn" id="open-log">Open log</button>
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="page-header">
+      <h1 class="page-title" id="page-title">Sounds</h1>
+      <div class="master">
+        <span class="master-label" id="master-label">Sounds on</span>
+        <button class="switch" role="switch" aria-checked="true" id="master-switch" aria-labelledby="master-label"></button>
+        <button class="text-btn" id="mute-1h">Mute 1 hour</button>
+      </div>
+    </header>
+
+    <section class="page" id="page-sounds">
+      <input class="search" id="search" type="search" placeholder="Search sounds" aria-label="Search sounds" autocomplete="off">
+      <div id="groups"></div>
+    </section>
+
+    <section class="page" id="page-connections" hidden>
+      <div class="box" id="connections-box"></div>
+    </section>
+
+    <section class="page" id="page-schedule" hidden>
+      <div class="box">
+        <h2 class="box-title">Quiet hours</h2>
+        <div class="setting-row">
+          <span class="setting-name">Quiet hours</span>
+          <button class="switch" role="switch" id="quiet-switch" aria-label="Quiet hours" aria-checked="false"></button>
+        </div>
+        <div class="setting-row">
+          <label for="quiet-start">From</label>
+          <input type="time" id="quiet-start" value="22:00">
+          <label for="quiet-end">to</label>
+          <input type="time" id="quiet-end" value="07:00">
+        </div>
+        <div class="setting-row">
+          <span class="setting-name">Still play the uptime alarm during quiet hours</span>
+          <button class="switch" role="switch" id="quiet-alarms" aria-label="Still play the uptime alarm during quiet hours" aria-checked="true"></button>
+        </div>
+      </div>
+      <div class="box">
+        <h2 class="box-title">Uptime watch</h2>
+        <div id="uptime-list"></div>
+        <button class="text-btn" id="add-site">+ Add a site</button>
+      </div>
+      <div class="box">
+        <h2 class="box-title">Countdown</h2>
+        <div class="setting-row">
+          <span class="setting-name">Countdown</span>
+          <button class="switch" role="switch" id="countdown-switch" aria-label="Countdown" aria-checked="false"></button>
+        </div>
+        <div class="setting-row">
+          <label for="countdown-target">Ends at</label>
+          <input type="datetime-local" id="countdown-target" value="2026-10-11T12:00">
+        </div>
+        <p class="countdown-big" id="countdown-left">1 hour left</p>
+      </div>
+      <div class="box">
+        <h2 class="box-title">Long commands</h2>
+        <p class="muted-line">Run <code>noizes run &lt;command&gt;</code> to hear a sound when a long command finishes.</p>
+        <button class="btn" id="copy-cmd">Copy</button>
+      </div>
+    </section>
+
+    <section class="page" id="page-general" hidden>
+      <div class="box">
+        <div class="setting-row">
+          <span class="setting-name">Start Noizes when Windows starts</span>
+          <button class="switch" role="switch" id="startup-switch" aria-label="Start Noizes when Windows starts" aria-checked="true"></button>
+        </div>
+        <div class="setting-row">
+          <span class="setting-name">Only play when I am not looking at the app that finished</span>
+          <button class="switch" role="switch" id="unfocused-switch" aria-label="Only play when I am not looking at the app that finished" aria-checked="true"></button>
+        </div>
+        <p class="muted-line">The sound is skipped while the app that sent the event is in front.</p>
+        <div class="setting-row">
+          <label for="port-input">Local server port</label>
+          <input type="number" id="port-input" value="7351" min="1024" max="65535">
+        </div>
+        <p class="muted-line" id="port-hint" hidden>Restart Noizes to apply</p>
+        <div class="setting-row">
+          <button class="btn" id="open-folder">Open settings file folder</button>
+          <button class="btn" id="open-log-2">Open log</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="panel-root"></div>
+<div id="toast-root" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
