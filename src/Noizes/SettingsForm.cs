@@ -5,6 +5,22 @@ namespace Noizes;
 
 public class SettingsForm : Form
 {
+    // S3: Bahnschrift SemiBold Condensed is the banner voice on every Windows 10/11 box;
+    // if it is absent, Segoe UI carries the same layout without failing
+    static readonly FontFamily DisplayFamily = FindDisplayFamily();
+
+    static FontFamily FindDisplayFamily()
+    {
+        try
+        {
+            foreach (var family in FontFamily.Families)
+                if (family.Name == "Bahnschrift SemiBold Condensed")
+                    return family;
+        }
+        catch { } // enumeration failed on this machine - the fallback below is the plan
+        return new FontFamily("Segoe UI");
+    }
+
     public HttpServer Server;
     public GitHubPoller GitHub;
     /// <summary>First launch with no config yet: open on the first tab (Integrations) with a one-line pointer.</summary>
@@ -12,13 +28,23 @@ public class SettingsForm : Form
 
     public ClaudeDesktopWatcher Watcher; // live start/stop when the feature flag toggles
 
+    // the victory palette (spec S1/S2/S5) - the only colors this skin uses
+    static readonly Color PageBack = Color.FromArgb(0x15, 0x18, 0x21);      // near-black pages
+    static readonly Color TextPrimary = Color.FromArgb(0xF2, 0xF4, 0xF8);   // near-white body text
+    static readonly Color TextSecondary = Color.FromArgb(0x9A, 0xA3, 0xB5); // slate: hints and off states
+    static readonly Color Accent = Color.FromArgb(0x0A, 0x84, 0xFF);        // victory blue: selection + actions
+    static readonly Color Gold = Color.FromArgb(0xFF, 0xC8, 0x00);          // the one gold Save
+    static readonly Color OnGreen = Color.FromArgb(0x39, 0xD3, 0x53);       // "on" everywhere
+    // same hue as the page, lifted so inputs read as fields - not a new palette color
+    static readonly Color FieldBack = Color.FromArgb(0x1D, 0x21, 0x2D);
+
     // events tab
     readonly ListView _list = new();
     readonly CheckBox _chkEnabled = new() { Text = "Play this event", AutoSize = true };
     readonly TrackBar _vol = new() { TickStyle = TickStyle.None, Minimum = 0, Maximum = 100, Width = 180 };
     readonly Label _lblVol = new() { Width = 44, TextAlign = ContentAlignment.MiddleLeft }; // text always comes from the event's real volume
-    readonly TextBox _txtSound = new() { ReadOnly = true, Width = 280 };
-    readonly TextBox _txtFocusApps = new() { Width = 300 };
+    readonly TextBox _txtSound = new() { ReadOnly = true, Width = 280, BackColor = FieldBack, ForeColor = TextPrimary };
+    readonly TextBox _txtFocusApps = new() { Width = 300, BackColor = FieldBack, ForeColor = TextPrimary };
     readonly Button _btnBrowse = new() { Text = "Choose sound…" };
     readonly Button _btnDefault = new() { Text = "Use default" };
     readonly Button _btnTest = new() { Text = "Test" };
@@ -29,14 +55,15 @@ public class SettingsForm : Form
     readonly CheckBox _chkUnfocused = new() { Text = "Only play when the source app is not focused", AutoSize = true };
     readonly CheckBox _chkQuiet = new() { Text = "Enable quiet hours (no sounds between these times)", AutoSize = true };
     readonly CheckBox _chkAllowAlarms = new() { Text = "Still play the uptime alarm during quiet hours", AutoSize = true };
-    readonly NumericUpDown _numPort = new() { Minimum = 1024, Maximum = 65535, Value = 7351, Width = 90 };
-    readonly TextBox _txtQuietStart = new() { Width = 60, MaxLength = 5 };
-    readonly TextBox _txtQuietEnd = new() { Width = 60, MaxLength = 5 };
+    readonly NumericUpDown _numPort = new() { Minimum = 1024, Maximum = 65535, Value = 7351, Width = 90, BackColor = FieldBack, ForeColor = TextPrimary };
+    readonly TextBox _txtQuietStart = new() { Width = 60, MaxLength = 5, BackColor = FieldBack, ForeColor = TextPrimary };
+    readonly TextBox _txtQuietEnd = new() { Width = 60, MaxLength = 5, BackColor = FieldBack, ForeColor = TextPrimary };
 
     // integrations tab (first tab — one obvious surface to turn things on and off)
     readonly TabControl _tabs;
     TabPage _integrationsPage, _extrasPage;
     readonly Dictionary<string, Label> _integStatus = new();
+    readonly List<Button> _navButtons = new(); // S4: one strip button per tab page
     readonly Button _btnClaude = new() { Text = "Set up" };
     readonly Button _btnCursor = new() { Text = "Set up" };
     readonly Button _btnGhReveal = new() { Text = "Add token…" };
@@ -45,9 +72,10 @@ public class SettingsForm : Form
     readonly Button _btnExtrasGo = new() { Text = "Configure…" };
     GroupBox _ghPanel;
     Font _boldFont;
-    readonly TextBox _txtToken = new() { Width = 340, UseSystemPasswordChar = true };
-    readonly TextBox _txtUser = new() { Width = 180 };
-    readonly NumericUpDown _numPoll = new() { Minimum = 5, Maximum = 300, Value = 10, Width = 90 };
+    Font _displayFont; // S3: shared display type, disposed with the form
+    readonly TextBox _txtToken = new() { Width = 340, UseSystemPasswordChar = true, BackColor = FieldBack, ForeColor = TextPrimary };
+    readonly TextBox _txtUser = new() { Width = 180, BackColor = FieldBack, ForeColor = TextPrimary };
+    readonly NumericUpDown _numPoll = new() { Minimum = 5, Maximum = 300, Value = 10, Width = 90, BackColor = FieldBack, ForeColor = TextPrimary };
     readonly Button _btnSaveGh = new() { Text = "Save" };
     readonly Button _btnTestGh = new() { Text = "Test" };
     readonly Label _lblGhStatus = new() { Text = "", AutoSize = true };
@@ -56,12 +84,13 @@ public class SettingsForm : Form
     readonly TextBox _txtUrls = new()
     {
         Multiline = true, ScrollBars = ScrollBars.Vertical, Height = 120,
-        Dock = DockStyle.Fill, AcceptsReturn = true, Font = new Font("Consolas", 9f)
+        Dock = DockStyle.Fill, AcceptsReturn = true, Font = new Font("Consolas", 9f),
+        BackColor = FieldBack, ForeColor = TextPrimary
     };
     readonly CheckBox _chkCountdown = new()
     { Text = "Enable countdown (plays at 1 hour, 30 minutes and 10 minutes before)", AutoSize = true };
     readonly DateTimePicker _dtp = new()
-    { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd  HH:mm", ShowUpDown = true, Width = 170 };
+    { Format = DateTimePickerFormat.Custom, CustomFormat = "yyyy-MM-dd  HH:mm", ShowUpDown = true, Width = 170, BackColor = FieldBack, ForeColor = TextPrimary };
 
     public SettingsForm()
     {
@@ -70,37 +99,73 @@ public class SettingsForm : Form
         MinimumSize = new Size(720, 600);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 9f);
+        BackColor = PageBack;    // S1: dark pages
+        ForeColor = TextPrimary; // labels inherit this unless they say otherwise
 
         // real icon in the title bar - same extraction the tray uses (csproj embeds the app icon)
         try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application; }
         catch { Icon = SystemIcons.Application; }
 
-        var tabs = _tabs = new TabControl { Dock = DockStyle.Fill, TabIndex = 0 };
+        var tabs = _tabs = new TabControl { Dock = DockStyle.Fill, TabIndex = 1 };
         _boldFont = new Font(Font, FontStyle.Bold);
-        Disposed += (s, e) => _boldFont.Dispose();
+        _displayFont = new Font(DisplayFamily, 10.5f); // S3: display type for row titles and group headers
+        Disposed += (s, e) => { _boldFont.Dispose(); _displayFont.Dispose(); };
 
         tabs.TabPages.Add(BuildIntegrationsTab());
         tabs.TabPages.Add(BuildEventsTab());
         tabs.TabPages.Add(BuildGeneralTab());
         tabs.TabPages.Add(BuildExtrasTab());
+        foreach (TabPage page in tabs.TabPages) { page.BackColor = PageBack; page.ForeColor = TextPrimary; }
+        tabs.BackColor = PageBack; // kill the light strip around the pages
+
+        // S4: the tab header becomes a hidden sliver and a nav strip of flat buttons
+        // switches pages instead (Ctrl+Tab between pages is lost - accepted)
+        tabs.SizeMode = TabSizeMode.Fixed;
+        tabs.ItemSize = new Size(0, 1);
+        tabs.Padding = new Point(0, 0);
+        var nav = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top, AutoSize = true, TabIndex = 0,
+            FlowDirection = FlowDirection.LeftToRight, Padding = new Padding(8)
+        };
+        foreach (TabPage page in tabs.TabPages)
+        {
+            var navButton = new Button { Text = page.Text, Tag = page, AutoSize = true, TabIndex = _navButtons.Count };
+            _navButtons.Add(navButton);
+            navButton.Click += (s, e) => _tabs.SelectedTab = (TabPage)((Button)s).Tag;
+            nav.Controls.Add(navButton);
+        }
+        SyncNav(); // light up the opening page
+
+        // S2: one button recipe everywhere - victory-blue actions, outline Close,
+        // and exactly one gold control in the window (the Save settings button)
+        foreach (var b in new[] { _btnClaude, _btnCursor, _btnGhReveal, _btnWatcher, _btnChromeHow,
+                                  _btnExtrasGo, _btnBrowse, _btnDefault, _btnTest, _btnSaveGh, _btnTestGh })
+            StylePrimary(b);
+
         _tabs.SelectedIndexChanged += (s, e) =>
         {
+            SyncNav(); // the strip always mirrors the visible page
+            StyleSelection(); // keep the accent on the selected row
             if (_tabs.SelectedTab == _integrationsPage) RefreshIntegrationStatuses(); // keep status text live
         };
 
         var bottom = new FlowLayoutPanel
         {
-            Dock = DockStyle.Bottom, AutoSize = true, TabIndex = 1,
+            Dock = DockStyle.Bottom, AutoSize = true, TabIndex = 2,
             FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8)
         };
         var btnClose = new Button { Text = "Close", TabIndex = 1 };
+        StyleSecondary(btnClose); // the outline recipe: secondary actions don't shout
         btnClose.Click += (s, e) => Close();
         var btnSave = new Button { Text = "Save settings", TabIndex = 0 };
+        StyleGold(btnSave); // the one gold control in the window
         btnSave.Click += (s, e) => SaveAll();
         bottom.Controls.Add(btnClose);
         bottom.Controls.Add(btnSave);
 
         Controls.Add(_tabs);
+        Controls.Add(nav);
         Controls.Add(bottom);
 
         AcceptButton = btnSave; // Enter saves
@@ -123,6 +188,8 @@ public class SettingsForm : Form
         _list.Dock = DockStyle.Fill;
         _list.TabIndex = 0;
         _list.ShowGroups = true;
+        _list.BackColor = PageBack;  // S5: dark body, light text (column headers stay system-drawn)
+        _list.ForeColor = TextPrimary;
         var groups = new Dictionary<string, ListViewGroup>();
         foreach (var def in EventRegistry.All)
         {
@@ -137,10 +204,10 @@ public class SettingsForm : Form
             _list.Items.Add(item);
             StyleEventRow(item);
         }
-        _list.SelectedIndexChanged += (s, e) => LoadSelectedEvent();
+        _list.SelectedIndexChanged += (s, e) => { StyleSelection(); LoadSelectedEvent(); };
 
-        var detail = new GroupBox { Text = "Selected event", Dock = DockStyle.Bottom, AutoSize = true, TabIndex = 1, Padding = new Padding(10) };
-        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
+        var detail = new GroupBox { Text = "Selected event", Dock = DockStyle.Bottom, AutoSize = true, TabIndex = 1, Padding = new Padding(10), Font = _displayFont };
+        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true, Font = Font };
         grid.Controls.Add(new Label { Text = "Enabled:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) }, 0, 0);
         _chkEnabled.TabIndex = 0;
         grid.Controls.Add(_chkEnabled, 1, 0);
@@ -204,8 +271,8 @@ public class SettingsForm : Form
         panel.Controls.Add(portPanel);
 
         // a real GroupBox like the Extras tab, so quiet hours reads as one grouped setting
-        var quietGroup = new GroupBox { Text = "Quiet hours", AutoSize = true, Width = 700, TabIndex = 3, Padding = new Padding(10) };
-        var quietPanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
+        var quietGroup = new GroupBox { Text = "Quiet hours", AutoSize = true, Width = 700, TabIndex = 3, Padding = new Padding(10), Font = _displayFont };
+        var quietPanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false, Font = Font };
         _chkQuiet.TabIndex = 0;
         quietPanel.Controls.Add(_chkQuiet);
         var quietTimes = new FlowLayoutPanel { AutoSize = true, Width = 640, TabIndex = 1 };
@@ -292,19 +359,19 @@ public class SettingsForm : Form
         };
         nameCol.Controls.Add(new Label
         {
-            Text = title, AutoSize = true, Font = _boldFont, Margin = new Padding(3, 3, 3, 0)
+            Text = title, AutoSize = true, Font = _displayFont, Margin = new Padding(3, 3, 3, 0)
         });
         nameCol.Controls.Add(new Label
         {
             Text = description, AutoSize = true, MaximumSize = new Size(414, 0),
-            ForeColor = Color.FromArgb(96, 96, 96), Margin = new Padding(3, 0, 3, 0)
+            ForeColor = TextSecondary, Margin = new Padding(3, 0, 3, 0)
         });
         row.Controls.Add(nameCol);
 
         var status = new Label
         {
             AutoSize = false, Width = 132, TextAlign = ContentAlignment.MiddleLeft,
-            ForeColor = Color.FromArgb(60, 60, 60), Margin = new Padding(8, 6, 8, 0)
+            ForeColor = TextSecondary, Margin = new Padding(8, 6, 8, 0)
         };
         _integStatus[statusKey] = status;
         row.Controls.Add(status);
@@ -319,17 +386,18 @@ public class SettingsForm : Form
         _ghPanel = new GroupBox
         {
             Text = "GitHub settings", Dock = DockStyle.Bottom, Visible = false,
-            AutoSize = true, Padding = new Padding(10)
+            AutoSize = true, Padding = new Padding(10), Font = _displayFont
         };
         var p = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false,
+            Font = Font // the header keeps the display font; the panel re-anchors body to Segoe UI 9
         };
 
         p.Controls.Add(new Label
         {
             Text = "Create a read-only token: github.com/settings/personal-access-tokens → Generate new token → fine-grained → Public repositories (read-only), no extra permissions.",
-            AutoSize = true, MaximumSize = new Size(650, 0), ForeColor = Color.FromArgb(96, 96, 96)
+            AutoSize = true, MaximumSize = new Size(650, 0), ForeColor = TextSecondary
         });
 
         var tokRow = new FlowLayoutPanel { AutoSize = true, Width = 660, TabIndex = 0 };
@@ -401,18 +469,27 @@ public class SettingsForm : Form
     void RefreshIntegrationStatuses()
     {
         var c = AppConfig.Current;
-        _integStatus["claude"].Text = HookInstalled(ClaudeCodeConnector.SettingsPath, "event/claude-code-done")
-            ? "Connected" : "Not connected";
-        _integStatus["cursor"].Text = HookInstalled(CursorConnector.HooksPath, "event/cursor-done")
-            ? "Connected" : "Not connected";
-        _integStatus["github"].Text = HasGitHubToken()
-            ? "Watching every " + Math.Clamp(c.GitHub.PollSeconds, 5, 300) + " s" : "Off";
-        _integStatus["watcher"].Text = c.Features.ClaudeDesktopWatcher ? "Watching" : "Off";
-        _integStatus["chrome"].Text = "-";
-        _integStatus["extras"].Text = ExtrasStatus(c);
+        var claude = HookInstalled(ClaudeCodeConnector.SettingsPath, "event/claude-code-done");
+        SetStatus("claude", claude ? "Connected" : "Not connected", claude);
+        var cursor = HookInstalled(CursorConnector.HooksPath, "event/cursor-done");
+        SetStatus("cursor", cursor ? "Connected" : "Not connected", cursor);
+        var gh = HasGitHubToken();
+        SetStatus("github", gh ? "Watching every " + Math.Clamp(c.GitHub.PollSeconds, 5, 300) + " s" : "Off", gh);
+        SetStatus("watcher", c.Features.ClaudeDesktopWatcher ? "Watching" : "Off", c.Features.ClaudeDesktopWatcher);
+        SetStatus("chrome", "-", false);
+        var extras = ExtrasStatus(c);
+        SetStatus("extras", extras, extras != "Off");
         _btnWatcher.Text = c.Features.ClaudeDesktopWatcher ? "Turn off" : "Turn on";
         if (!_ghPanel.Visible)
             _btnGhReveal.Text = HasGitHubToken() ? "Edit…" : "Add token…";
+    }
+
+    /// <summary>One status column voice: text plus its on/off color, so the state can't be missed.</summary>
+    void SetStatus(string key, string text, bool on)
+    {
+        var label = _integStatus[key];
+        label.Text = text;
+        label.ForeColor = on ? OnGreen : TextSecondary; // S5: green means on, slate means off
     }
 
     static bool HookInstalled(string file, string marker) =>
@@ -438,8 +515,8 @@ public class SettingsForm : Form
             AutoSize = true, Padding = new Padding(12), WrapContents = false
         };
 
-        var g1 = new GroupBox { Text = "Uptime watch", AutoSize = true, Width = 700, TabIndex = 0, Padding = new Padding(10) };
-        var g1p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false, TabIndex = 0 };
+        var g1 = new GroupBox { Text = "Uptime watch", AutoSize = true, Width = 700, TabIndex = 0, Padding = new Padding(10), Font = _displayFont };
+        var g1p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false, TabIndex = 0, Font = Font };
         g1p.Controls.Add(new Label
         {
             Text = "One URL per line. Each URL is checked every 3 minutes; if one fails twice in a row, the\n\"Uptime: a site is down\" alarm plays (even during quiet hours unless you say otherwise).",
@@ -450,8 +527,8 @@ public class SettingsForm : Form
         g1p.Controls.Add(_txtUrls);
         g1.Controls.Add(g1p);
 
-        var g2 = new GroupBox { Text = "Countdown", AutoSize = true, Width = 700, TabIndex = 1, Padding = new Padding(10) };
-        var g2p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false };
+        var g2 = new GroupBox { Text = "Countdown", AutoSize = true, Width = 700, TabIndex = 1, Padding = new Padding(10), Font = _displayFont };
+        var g2p = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, Width = 660, WrapContents = false, Font = Font };
         _chkCountdown.TabIndex = 0;
         g2p.Controls.Add(_chkCountdown);
         var dtpRow = new FlowLayoutPanel { AutoSize = true, Width = 650, TabIndex = 1 };
@@ -505,10 +582,76 @@ public class SettingsForm : Form
         var ec = AppConfig.Current.Events[(string)item.Tag];
         item.UseItemStyleForSubItems = false;
         item.SubItems[1].Text = ec.Enabled ? "On" : "Off";
-        item.SubItems[1].ForeColor = ec.Enabled ? Color.FromArgb(0, 128, 0) : Color.Gray;
+        item.SubItems[1].ForeColor = ec.Enabled ? OnGreen : TextSecondary;
         item.SubItems[1].Font = ec.Enabled ? _boldFont : _list.Font; // reset font so a row turned Off isn't left bold
         item.SubItems[2].Text = ec.Volume + "%";
         item.SubItems[3].Text = string.IsNullOrEmpty(ec.SoundPath) ? "(default)" : Path.GetFileName(ec.SoundPath);
+    }
+
+    /// <summary>S4: the active page's nav button lights up - filled accent against the quiet outline.</summary>
+    void SyncNav()
+    {
+        foreach (var navButton in _navButtons)
+            StyleNav(navButton, ReferenceEquals(navButton.Tag, _tabs.SelectedTab));
+    }
+
+    static void StyleNav(Button b, bool active)
+    {
+        if (active)
+        {
+            b.BackColor = Accent;
+            b.ForeColor = Color.White;
+            b.FlatAppearance.BorderSize = 0;
+            b.FlatAppearance.MouseOverBackColor = ControlPaint.Dark(Accent); // never inherit the outline recipe's hover
+            b.FlatAppearance.MouseDownBackColor = ControlPaint.DarkDark(Accent);
+        }
+        else StyleSecondary(b); // inactive nav is the same quiet outline recipe as Close
+    }
+
+    /// <summary>S2: flat victory-blue action buttons - white text, hover darker, all standard properties.</summary>
+    static void StylePrimary(Button b)
+    {
+        b.FlatStyle = FlatStyle.Flat;
+        b.BackColor = Accent;
+        b.ForeColor = Color.White;
+        b.FlatAppearance.BorderSize = 0;
+        b.FlatAppearance.MouseOverBackColor = ControlPaint.Dark(Accent); // same hue, darker
+        b.FlatAppearance.MouseDownBackColor = ControlPaint.DarkDark(Accent);
+    }
+
+    /// <summary>S2: the secondary recipe - blue outline on the page color, for Close and quiet controls.</summary>
+    static void StyleSecondary(Button b)
+    {
+        b.FlatStyle = FlatStyle.Flat;
+        b.BackColor = PageBack;
+        b.ForeColor = TextPrimary;
+        b.FlatAppearance.BorderSize = 1;
+        b.FlatAppearance.BorderColor = Accent;
+        b.FlatAppearance.MouseOverBackColor = FieldBack; // a nudge, not a flash
+        b.FlatAppearance.MouseDownBackColor = FieldBack;
+    }
+
+    /// <summary>S2: gold with near-black text - reserved for the bottom-bar Save settings.</summary>
+    static void StyleGold(Button b)
+    {
+        b.FlatStyle = FlatStyle.Flat;
+        b.BackColor = Gold;
+        b.ForeColor = PageBack;
+        b.FlatAppearance.BorderSize = 0;
+        b.FlatAppearance.MouseOverBackColor = ControlPaint.Dark(Gold); // same hue, darker
+        b.FlatAppearance.MouseDownBackColor = ControlPaint.DarkDark(Gold);
+    }
+
+    /// <summary>One accent blue for selection: per-item colors replace the system highlight on the dark list.</summary>
+    void StyleSelection()
+    {
+        foreach (ListViewItem item in _list.Items)
+        {
+            var back = item.Selected ? Accent : PageBack;
+            item.BackColor = back;
+            foreach (ListViewItem.ListViewSubItem sub in item.SubItems)
+                sub.BackColor = back; // UseItemStyleForSubItems=false means every cell carries its own color
+        }
     }
 
     void RefreshVolumeLabel() => _lblVol.Text = _vol.Value + "%";
