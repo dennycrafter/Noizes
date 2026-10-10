@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using NAudio.Wave;
 
@@ -591,6 +592,16 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("dedup-reason", false, ex.Message); }
 
+        // 9. windows CI only: the settings form must construct headless - no Show(), so no
+        // window handles (MessageBox lives only in click handlers, never in the ctor).
+        // Its own method: the Linux harness never calls it, so the WinForms type graph
+        // stays untouched here.
+        if (OperatingSystem.IsWindows())
+        {
+            try { RunWindowsFormChecks(); }
+            catch (Exception ex) { Check("form-constructs", false, $"{ex.GetType().Name}: {ex.Message}"); }
+        }
+
         // report
         var report = string.Join(Environment.NewLine, Lines) + Environment.NewLine +
                      $"SUMMARY: {Lines.Count - _fails} passed, {_fails} failed" + Environment.NewLine;
@@ -603,5 +614,32 @@ public static class SelfTest
         catch { }
 
         return _fails == 0 ? 0 : 1;
+    }
+
+    // Windows CI only (guarded in Run): construct the settings form headless and assert
+    // the whole surface came up - all four tabs present. Runs for real on windows-latest;
+    // skipped on Linux where WinForms cannot load. NoInlining keeps the SettingsForm
+    // reference out of Run's compiled body on Linux.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void RunWindowsFormChecks()
+    {
+        // the real app loads config before any form opens (Program.Main); without it the
+        // ctor's StyleEventRow hits an empty Events dictionary
+        AppConfig.Load();
+        using var form = new SettingsForm();
+        var tabs = FindDescendant(form, c => c is TabControl) as TabControl;
+        Check("form-constructs", form.Controls.Count > 0 && tabs != null && tabs.TabCount == 4,
+            $"controls={form.Controls.Count} tabs={(tabs == null ? -1 : tabs.TabCount)}");
+    }
+
+    static Control FindDescendant(Control root, Func<Control, bool> match)
+    {
+        foreach (Control child in root.Controls)
+        {
+            if (match(child)) return child;
+            var found = FindDescendant(child, match);
+            if (found != null) return found;
+        }
+        return null;
     }
 }
