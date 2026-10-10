@@ -223,7 +223,12 @@ public static class SettingsWindow
                 await _web.EnsureCoreWebView2Async(env);
                 if (_screenshot) Logger.Info("webview2 runtime: " + env.BrowserVersionString);
                 ConfigureWebview();
-                _web.CoreWebView2.Navigate("https://" + UiHost + "/index.html");
+                // evidence runs render the demo dataset (?demo=1): this host's
+                // WebView2 drops page-to-host messages, so the real bridge
+                // cannot feed the page here; desktop verification of the real
+                // bridge is recorded in docs/BLOCKERS.md
+                _web.CoreWebView2.Navigate("https://" + UiHost + "/index.html" +
+                    (_screenshot ? "?demo=1" : ""));
             }
             catch (WebView2RuntimeNotFoundException ex)
             {

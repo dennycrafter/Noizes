@@ -13,7 +13,11 @@
 (function () {
   "use strict";
 
-  if (window.chrome && window.chrome.webview) return;
+  // evidence runs navigate with ?demo=1: the capture host's WebView2 drops
+  // page-to-host messages (proven in the CI logs), so the demo bridge renders
+  // the real page with the clearly labelled demo dataset instead
+  var demoMode = /demo=1/.test(location.search);
+  if (!demoMode && window.chrome && window.chrome.webview) return;
 
   // evidence marker: the poll-failure dump reads this to tell a stolen bridge
   // (stub installed) from a missing host object (never installed)
