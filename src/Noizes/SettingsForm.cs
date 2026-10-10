@@ -19,7 +19,7 @@ public class SettingsForm : Form
     readonly Label _lblVol = new() { Width = 44, TextAlign = ContentAlignment.MiddleLeft }; // text always comes from the event's real volume
     readonly TextBox _txtSound = new() { ReadOnly = true, Width = 280 };
     readonly TextBox _txtFocusApps = new() { Width = 300 };
-    readonly Button _btnBrowse = new() { Text = "Choose sound..." };
+    readonly Button _btnBrowse = new() { Text = "Choose sound…" };
     readonly Button _btnDefault = new() { Text = "Use default" };
     readonly Button _btnTest = new() { Text = "Test" };
     string _currentEvent = "";
@@ -200,7 +200,7 @@ public class SettingsForm : Form
         portPanel.Controls.Add(new Label { Text = "Local server port:", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         _numPort.TabIndex = 0;
         portPanel.Controls.Add(_numPort);
-        portPanel.Controls.Add(new Label { Text = "  (hooks call http://127.0.0.1:<port>/event/...)", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        portPanel.Controls.Add(new Label { Text = "(hooks call http://127.0.0.1:<port>/event/...)", AutoSize = true, Margin = new Padding(12, 8, 3, 0) });
         panel.Controls.Add(portPanel);
 
         // a real GroupBox like the Extras tab, so quiet hours reads as one grouped setting
@@ -209,7 +209,7 @@ public class SettingsForm : Form
         _chkQuiet.TabIndex = 0;
         quietPanel.Controls.Add(_chkQuiet);
         var quietTimes = new FlowLayoutPanel { AutoSize = true, Width = 640, TabIndex = 1 };
-        quietTimes.Controls.Add(new Label { Text = "From", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
+        quietTimes.Controls.Add(new Label { Text = "from", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
         _txtQuietStart.TabIndex = 0;
         quietTimes.Controls.Add(_txtQuietStart);
         quietTimes.Controls.Add(new Label { Text = "to", AutoSize = true, Margin = new Padding(3, 8, 3, 0) });
@@ -328,7 +328,7 @@ public class SettingsForm : Form
 
         p.Controls.Add(new Label
         {
-            Text = "Create a read-only token: github.com/settings/personal-access-tokens -> Generate new token -> fine-grained -> Public repositories (read-only), no extra permissions.",
+            Text = "Create a read-only token: github.com/settings/personal-access-tokens → Generate new token → fine-grained → Public repositories (read-only), no extra permissions.",
             AutoSize = true, MaximumSize = new Size(650, 0), ForeColor = Color.FromArgb(96, 96, 96)
         });
 
@@ -569,7 +569,7 @@ public class SettingsForm : Form
     {
         ApplyGitHub();
         _btnTestGh.Enabled = false;
-        _lblGhStatus.Text = "Testing...";
+        _lblGhStatus.Text = "Testing…";
         try
         {
             using var http = new HttpClient();
