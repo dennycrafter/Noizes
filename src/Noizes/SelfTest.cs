@@ -123,6 +123,13 @@ public static class SelfTest
                 ("Countdown.Enabled", v => v is false, "false"),
                 ("Countdown.TargetLocal", NoonTomorrow, "noon the day after creation"),
                 ("Features.ClaudeDesktopWatcher", v => v is false, "false - UIA watcher is opt-in"),
+                ("Muted", v => v is false, "false - sounds are on by default"),
+                ("MutedUntil", v => v is null, "null - no timed mute by default"),
+                ("Window.X", v => v is -1, "-1 - Windows places the window on first run"),
+                ("Window.Y", v => v is -1, "-1 - Windows places the window on first run"),
+                ("Window.Width", v => v is 1080, "1080 - the new-window default"),
+                ("Window.Height", v => v is 720, "720 - the new-window default"),
+                ("Window.Maximized", v => v is false, "false"),
             };
 
             object ReadPath(string path)
@@ -154,7 +161,8 @@ public static class SelfTest
             {
                 if (p.Name == "Events") continue; // per-event defaults -> all-defaults-events
                 if (p.PropertyType == typeof(QuietHoursConfig) || p.PropertyType == typeof(GitHubConfig) ||
-                    p.PropertyType == typeof(CountdownConfig) || p.PropertyType == typeof(FeaturesConfig))
+                    p.PropertyType == typeof(CountdownConfig) || p.PropertyType == typeof(FeaturesConfig) ||
+                    p.PropertyType == typeof(WindowConfig))
                 {
                     foreach (var sp in p.PropertyType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
                         if (!covered.Remove(p.Name + "." + sp.Name))
@@ -561,6 +569,7 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("features-default-off", false, ex.Message); }
 
+
         // 7c. a duplicate trigger inside the dedup window must not be mislabeled sound-missing
         try
         {
@@ -591,6 +600,202 @@ public static class SelfTest
             }
         }
         catch (Exception ex) { Check("dedup-reason", false, ex.Message); }
+
+        // 10. v1.2.0 compatibility: a config.json from v1.2.0 (no Muted/MutedUntil/Window)
+        // loads with every old value unchanged and the new fields at their safe defaults
+        try
+        {
+            const string v120 = """
+                {
+                  "Port": 7351,
+                  "StartWithWindows": true,
+                  "OnlyWhenUnfocused": true,
+                  "Quiet": { "Enabled": true, "Start": "23:00", "End": "06:30", "AllowAlarms": false },
+                  "GitHub": { "Token": "tok123", "Username": "den", "PollSeconds": 30, "Repos": ["a/b"] },
+                  "UptimeUrls": [ "https://example.com" ],
+                  "Countdown": { "Enabled": true, "TargetLocal": "2026-12-01T12:00:00" },
+                  "Features": { "ClaudeDesktopWatcher": true },
+                  "Events": { "claude-code-done": { "Enabled": true, "Volume": 65, "SoundPath": "C:\\sounds\\win.mp3", "FocusApps": ["code"] } }
+                }
+                """;
+            var loaded = JsonSerializer.Deserialize<AppConfig>(v120);
+            AppConfig.EnsureDefaults(loaded);
+            var ec = loaded.Events["claude-code-done"];
+            var oldOk = loaded.Port == 7351 && loaded.StartWithWindows && loaded.OnlyWhenUnfocused &&
+                loaded.Quiet.Enabled && loaded.Quiet.Start == "23:00" && loaded.Quiet.End == "06:30" && !loaded.Quiet.AllowAlarms &&
+                loaded.GitHub.Token == "tok123" && loaded.GitHub.Username == "den" && loaded.GitHub.PollSeconds == 30 &&
+                loaded.GitHub.Repos.SequenceEqual(new[] { "a/b" }) &&
+                loaded.UptimeUrls.SequenceEqual(new[] { "https://example.com" }) &&
+                loaded.Countdown.Enabled && loaded.Countdown.TargetLocal == new DateTime(2026, 12, 1, 12, 0, 0) &&
+                loaded.Features.ClaudeDesktopWatcher && ec.Enabled && ec.Volume == 65 &&
+                ec.SoundPath == "C:\\sounds\\win.mp3" && ec.FocusApps.SequenceEqual(new[] { "code" });
+            var newOk = !loaded.Muted && loaded.MutedUntil == null &&
+                loaded.Window != null && loaded.Window.X == -1 && loaded.Window.Y == -1 &&
+                loaded.Window.Width == 1080 && loaded.Window.Height == 720 && !loaded.Window.Maximized;
+            Check("v120-config-survives", oldOk && newOk,
+                oldOk && newOk ? "old values unchanged, new fields at safe defaults" : $"oldOk={oldOk} newOk={newOk}");
+        }
+        catch (Exception ex) { Check("v120-config-survives", false, ex.Message); }
+
+        // 11. mute: the dispatch gate skips with reason muted, the uptime alarm obeys it,
+        // a timed mute works, and a passed MutedUntil clears itself
+        try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            AppConfig.DirOverride = Path.Combine(Path.GetTempPath(), "noizes-selftest-mute-" + Guid.NewGuid().ToString("N"));
+            var captured = new List<string>();
+            Logger.Sink = captured.Add;
+            try
+            {
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                cfg.Events["claude-code-done"].Enabled = true;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+                cfg.Muted = true;
+                var r1 = EventBus.Dispatch("claude-code-done");
+                var logged = captured.Contains("event claude-code-done: skipped (muted)");
+                Check("mute-skips", r1.Reason == "muted" && logged,
+                    $"reason={r1.Reason} logged={logged}");
+
+                // the uptime alarm obeys mute too, even though quiet hours would exempt it
+                var r2 = EventBus.Dispatch("uptime-alarm");
+                Check("mute-gates-alarm", r2.Reason == "muted", $"reason={r2.Reason}");
+
+                // a timed mute in the future silences as well
+                cfg.Muted = false;
+                cfg.MutedUntil = DateTime.Now.AddMinutes(5);
+                var r3 = EventBus.Dispatch("claude-code-done");
+                Check("timed-mute-active", r3.Reason == "muted", $"reason={r3.Reason}");
+
+                // a MutedUntil in the past clears itself and unmutes the gate
+                cfg.MutedUntil = DateTime.Now.AddMinutes(-5);
+                var r4 = EventBus.Dispatch("claude-code-done");
+                Check("muted-until-clears", cfg.MutedUntil == null && r4.Reason != "muted",
+                    $"cleared={cfg.MutedUntil == null} reason={r4.Reason}");
+
+                // and IsMutedNow agrees with the gate from the outside
+                cfg.MutedUntil = DateTime.Now.AddMinutes(5);
+                var nowActive = EventBus.IsMutedNow(cfg);
+                cfg.MutedUntil = null;
+                Check("mute-state-helper", nowActive && !EventBus.IsMutedNow(cfg), "pure check matches the gate");
+            }
+            finally
+            {
+                Logger.Sink = null;
+                AppConfig.DirOverride = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("mute-skips", false, ex.Message); }
+
+        // 12. one source of truth: the Claude desktop event switch and
+        // Features.ClaudeDesktopWatcher move together, and the watcher is told to run or stop
+        try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            AppConfig.DirOverride = Path.Combine(Path.GetTempPath(), "noizes-selftest-sync-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+                bool? watcherTold = null;
+                UiBridge.Services.RunClaudeDesktopWatcher = b => watcherTold = b;
+
+                UiBridge.SetEventEnabled("claude-desktop-done", true);
+                var onOk = cfg.Events["claude-desktop-done"].Enabled && cfg.Features.ClaudeDesktopWatcher && watcherTold == true;
+                Check("claude-sync-on", onOk, $"event={cfg.Events["claude-desktop-done"].Enabled} flag={cfg.Features.ClaudeDesktopWatcher} watcherTold={watcherTold}");
+
+                UiBridge.SetEventEnabled("claude-desktop-done", false);
+                var offOk = !cfg.Events["claude-desktop-done"].Enabled && !cfg.Features.ClaudeDesktopWatcher && watcherTold == false;
+                Check("claude-sync-off", offOk, $"event={cfg.Events["claude-desktop-done"].Enabled} flag={cfg.Features.ClaudeDesktopWatcher} watcherTold={watcherTold}");
+
+                // the other direction: the Connections page switch moves the event too
+                UiBridge.SetWatcherEnabled(true);
+                Check("claude-sync-reverse", cfg.Features.ClaudeDesktopWatcher && cfg.Events["claude-desktop-done"].Enabled,
+                    "flag on turned the event on");
+
+                // a normal event switch must not touch the watcher flag
+                UiBridge.SetEventEnabled("claude-code-done", true);
+                Check("claude-sync-untouched-elsewhere",
+                    cfg.Events["claude-code-done"].Enabled && cfg.Features.ClaudeDesktopWatcher,
+                    "unrelated event left the flag alone");
+
+                // the saved file shows the same state
+                var saved = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(AppConfig.FilePath));
+                Check("claude-sync-persisted",
+                    saved != null && saved.Features.ClaudeDesktopWatcher &&
+                    saved.Events["claude-desktop-done"].Enabled,
+                    "saved config agrees with memory");
+            }
+            finally
+            {
+                UiBridge.Services.RunClaudeDesktopWatcher = null;
+                AppConfig.DirOverride = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("claude-sync-on", false, ex.Message); }
+
+        // 13. bridge envelope: replies carry {id, ok, data}, the token never leaves the app,
+        // and a volume-only change defers its save to the 300ms debounce
+        try
+        {
+            var prop = typeof(AppConfig).GetProperty(nameof(AppConfig.Current))!;
+            var original = (AppConfig)prop.GetValue(null)!;
+            AppConfig.DirOverride = Path.Combine(Path.GetTempPath(), "noizes-selftest-bridge-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var cfg = new AppConfig();
+                AppConfig.EnsureDefaults(cfg);
+                cfg.GitHub.Token = "secret-token-xyz";
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { cfg });
+
+                var posted = new List<string>();
+                Action<string> probe = posted.Add;
+                UiBridge.Attach(probe);
+                try
+                {
+                    UiBridge.HandleMessage("{\"id\":7,\"type\":\"getState\"}");
+                    var reply = posted.FirstOrDefault(l => l.Contains("\"id\":7"));
+                    var shaped = reply != null && reply.Contains("\"ok\":true") && reply.Contains("\"tokenSet\":true");
+                    Check("envelope-shape", shaped,
+                        shaped ? "getState replied {id, ok, data} with tokenSet" : "reply: " + (reply ?? "none"));
+                    Check("token-never-sent", reply != null && !reply.Contains("secret-token-xyz"),
+                        "the token value stayed in the app");
+
+                    // an unknown type and an unknown event id answer with ok:false, not silence
+                    UiBridge.HandleMessage("{\"id\":8,\"type\":\"no-such-message\"}");
+                    UiBridge.HandleMessage("{\"id\":9,\"type\":\"setEvent\",\"eventId\":\"not-an-event\",\"enabled\":true}");
+                    Check("envelope-errors",
+                        posted.Any(l => l.Contains("\"id\":8") && l.Contains("\"ok\":false")) &&
+                        posted.Any(l => l.Contains("\"id\":9") && l.Contains("\"ok\":false")),
+                        "unknown type and unknown event both answered");
+                }
+                finally { UiBridge.Detach(probe); }
+
+                // volume-only: the reply goes out at once but the file save is deferred
+                UiBridge.SetEventEnabled("claude-code-done", true); // immediate save at volume 40
+                var before = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(AppConfig.FilePath));
+                UiBridge.HandleMessage("{\"id\":10,\"type\":\"setEvent\",\"eventId\":\"claude-code-done\",\"volume\":77}");
+                var afterMsg = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(AppConfig.FilePath));
+                var deferred = afterMsg != null && afterMsg.Events["claude-code-done"].Volume == before.Events["claude-code-done"].Volume;
+                UiBridge.FlushPendingSave();
+                var flushed = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(AppConfig.FilePath));
+                Check("volume-save-debounced", deferred && flushed.Events["claude-code-done"].Volume == 77,
+                    $"deferred={deferred} flushed={flushed.Events["claude-code-done"].Volume}");
+            }
+            finally
+            {
+                AppConfig.DirOverride = null;
+                prop.GetSetMethod(true)!.Invoke(null, new object[] { original });
+            }
+        }
+        catch (Exception ex) { Check("envelope-shape", false, ex.Message); }
 
         // 9. windows CI only: the settings form must construct headless - no Show(), so no
         // window handles (MessageBox lives only in click handlers, never in the ctor).
