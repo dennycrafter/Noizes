@@ -106,7 +106,7 @@
     '  padding: 10px 12px; font: inherit; font-size: 14px;',
     '}',
     '.snd-search::placeholder { color: var(--muted, #9a9aa3); }',
-    '.snd-search:focus { outline: none; border-color: var(--accent-ink, #9d85ff); }',
+    '.snd-search:focus { outline: none; border-color: var(--muted, #9a9aa3); }',
     '.snd-group {',
     '  background: var(--surface, #121215);',
     '  border: 1px solid var(--line, #2a2a30);',
@@ -118,6 +118,7 @@
     '  flex: 1; margin: 0; font-size: 13px; font-weight: 600;',
     '  color: var(--muted, #9a9aa3); letter-spacing: 0.02em;',
     '}',
+    '.snd-group-count { font-size: 13px; color: var(--muted, #9a9aa3); white-space: nowrap; }',
     '.snd-notconnected { margin: 0; padding: 0 16px 10px; font-size: 13px; color: var(--muted, #9a9aa3); }',
     '.snd-navlink { color: var(--info, #6ab8ff); }',
     '.snd-navlink:hover { text-decoration: underline; }',
@@ -163,12 +164,12 @@
     '}',
     '.snd-switch[aria-checked="true"] { background: var(--accent, #7c5cff); border-color: transparent; }',
     '.snd-switch[aria-checked="true"] .snd-knob { transform: translateX(16px); background: #ffffff; }',
-    '.snd-switch.is-mixed { border-color: var(--line, #2a2a30); }',
-    '.snd-switch.is-mixed .snd-knob { transform: translateX(8px); }',
+    '.snd-switch.is-mixed { border-color: var(--muted, #9a9aa3); }',
+    '.snd-switch.is-mixed .snd-knob { transform: translateX(8px); background: var(--silver, #e8e8ea); }',
     '.snd-detail { flex: 1 1 100%; padding: 4px 0 10px; }',
     '.snd-volrow, .snd-soundrow { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 8px 0; }',
     '.snd-volrow > label { font-size: 13px; color: var(--muted, #9a9aa3); }',
-    '.snd-range { width: 220px; max-width: 100%; margin: 0; accent-color: var(--accent, #7c5cff); }',
+    '.snd-range { width: 220px; max-width: 100%; margin: 0; accent-color: var(--silver, #e8e8ea); }',
     '.snd-volout { font-size: 13px; color: var(--silver, #e8e8ea); min-width: 44px; }',
     '.snd-filename { flex: 1 1 120px; min-width: 120px; font-size: 13px; color: var(--muted, #9a9aa3); overflow-wrap: anywhere; }',
     '.snd-btn {',
@@ -199,7 +200,6 @@
     '  background: var(--surface-2, #1c1c20); color: var(--fg, #f2f2f4);',
     '  border: 1px solid var(--bad, #ff6f66); border-radius: 6px; font-size: 13px;',
     '}',
-    '.snd-page :focus-visible { outline: 2px solid var(--accent-ink, #9d85ff); outline-offset: 2px; }',
     '@media (prefers-reduced-motion: reduce) {',
     '  .snd-page, .snd-page * { transition: none !important; }',
     '}'
@@ -695,6 +695,11 @@
       if (!allOn && anyOn) {
         sw.classList.add('is-mixed'); // middle state: knob centered
         sw.setAttribute('data-state', 'mixed');
+        // Say it in words too, so some on never reads as all off.
+        var onCount = events.filter(function (ev) { return ev.enabled; }).length;
+        var countText = onCount + ' of ' + events.length + ' on';
+        head.appendChild(el('span', { class: 'snd-group-count', 'data-testid': 'group-count', text: countText }));
+        sw.setAttribute('aria-label', 'Sounds for ' + groupName + ' group, ' + countText);
       }
       sw.setAttribute('data-testid', 'group-switch');
       head.appendChild(sw);

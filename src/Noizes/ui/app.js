@@ -180,12 +180,12 @@
     if (mutedForTime) {
       els.mutedUntil.hidden = false;
       els.mutedUntil.textContent = "Muted until " + formatTime(untilMs);
-      els.muteBtn.textContent = "Unmute";
     } else {
       els.mutedUntil.hidden = true;
       els.mutedUntil.textContent = "";
-      els.muteBtn.textContent = "Mute 1 hour";
     }
+    // Label follows the muted state, so it always says what a click will do.
+    els.muteBtn.textContent = muted ? "Unmute" : "Mute 1 hour";
     if (muteRecheckTimer) {
       window.clearTimeout(muteRecheckTimer);
       muteRecheckTimer = 0;
