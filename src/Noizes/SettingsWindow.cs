@@ -577,6 +577,8 @@ public static class SettingsWindow
             Console.WriteLine(_smokeFails.Count == 0
                 ? "SMOKE: all checks passed"
                 : "SMOKE: " + _smokeFails.Count + " check(s) failed: " + string.Join(", ", _smokeFails));
+            if (_smokeFails.Count == 0)
+                Console.WriteLine("::notice title=Smoke test passed::Real settings window, real connection: settings loaded, a click saved, 4 pages rendered, no script errors, window on screen");
             Close();
         }
 

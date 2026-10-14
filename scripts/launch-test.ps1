@@ -209,4 +209,5 @@ if ($script:fails.Count -gt 0) {
   exit 1
 }
 Write-Host 'LAUNCH TEST: all cases passed'
+Write-Host '::notice title=Launch test passed::First open, close to tray, reopen from tray, sign-in start, Start menu after sign-in, off-screen and oversized saved windows'
 exit 0
