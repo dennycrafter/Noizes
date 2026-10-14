@@ -336,7 +336,7 @@ public static class SettingsWindow
             core.WebMessageReceived += (s, e) =>
             {
                 string json = null;
-                try { json = UiBridge.DecodeWebMessage(e.WebMessageAsJson); }
+                try { json = e.TryGetWebMessageAsString(); } // DELIBERATE BUG for the proof run
                 catch (Exception ex) { Logger.Info("bridge: could not read a page message: " + ex.Message); }
                 if (json == null) return;
                 if (_screenshot || _smoke) Logger.Info("bridge page said: " + json); // evidence runs narrate

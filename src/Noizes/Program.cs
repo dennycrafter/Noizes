@@ -56,7 +56,7 @@ internal static class Program
         if (!createdNew)
         {
             // already running in the tray: a launch by the user opens its settings window
-            if (!background) SignalRunningCopy();
+            // DELIBERATE BUG for the proof run: second launch does nothing
             return 0;
         }
         using var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowSettingsSignal);
