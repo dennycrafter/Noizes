@@ -101,6 +101,30 @@ begin
     RegWriteStringValue(HKEY_CURRENT_USER, EnvironmentKey, 'Path', Updated);
 end;
 
+// Noizes lives in the tray, so it is usually running when someone upgrades. Windows'
+// automatic "close the app" step cannot close a tray app, and then the files are in use
+// and Setup stops (exit code 5 in a silent run). Close it first, every time: Noizes keeps
+// all settings in %APPDATA%\Noizes\config.json, which is saved on every change.
+procedure CloseRunningNoizes();
+var
+  Code: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /T /IM Noizes.exe', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Sleep(1500); // let Windows release the file handles
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  CloseRunningNoizes();
+  Result := '';
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  CloseRunningNoizes();
+  Result := True;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
