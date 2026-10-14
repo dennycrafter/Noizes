@@ -83,6 +83,14 @@ jobs:
         shell: pwsh
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=${{ steps.ver.outputs.version }} installer/noizes.iss'
 
+      # release gate: upgrading over older releases keeps every setting and opens the window
+      - name: Install and upgrade test
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/install-test.ps1 -NewInstaller "installer/Output/Noizes-${{ steps.ver.outputs.version }}-setup.exe"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
