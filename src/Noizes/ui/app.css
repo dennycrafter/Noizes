@@ -158,6 +158,11 @@ button { cursor: pointer; }
   padding: 24px;
 }
 
+/* The page area takes focus on every page switch (so screen readers land there).
+   It is a container, not a control, so it never shows a focus ring. */
+.nz-page:focus,
+.nz-page:focus-visible { outline: none; }
+
 .nz-page-missing { color: var(--muted); }
 
 .nz-page-error { color: var(--bad); }

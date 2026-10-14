@@ -105,3 +105,19 @@ test.describe('text rules', () => {
     expect(bad).toEqual([]);
   });
 });
+
+test.describe('content area frame', () => {
+  test('the page area never shows a focus ring, even right after it takes focus', async ({ page }) => {
+    await open(page);
+    for (const name of PAGES) {
+      await gotoPage(page, name);
+      const info = await page.evaluate(() => {
+        const el = document.getElementById('page');
+        const cs = getComputedStyle(el);
+        return { focused: document.activeElement === el, style: cs.outlineStyle, width: cs.outlineWidth };
+      });
+      expect(info.focused).toBe(true); // focus still moves there for screen readers
+      expect(info.style === 'none' || info.width === '0px').toBe(true);
+    }
+  });
+});

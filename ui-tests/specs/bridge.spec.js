@@ -56,9 +56,11 @@ test.describe('one-click switching and mute', () => {
     const sw = box.locator('.snd-group-head button[role="switch"]');
     await expect(sw).toHaveAttribute('data-state', 'mixed'); // the middle state
     await expect(sw).toHaveAttribute('aria-checked', 'false'); // switch role stays binary
+    await expect(box.getByTestId('group-count')).toHaveText('2 of 4 on'); // mixed never reads as off
 
     await sw.click();
     await expect(sw).not.toHaveAttribute('data-state', 'mixed'); // back to a plain all-on switch
+    await expect(box.getByTestId('group-count')).toHaveCount(0);
     for (const id of ['browser-claude-done', 'browser-obvious-done', 'browser-watch-done', 'browser-download-done']) {
       await expect(page.locator(`[data-event-id="${id}"] button[role="switch"]`)).toHaveAttribute('aria-checked', 'true');
     }
@@ -91,6 +93,23 @@ test.describe('one-click switching and mute', () => {
     expect(set).toHaveLength(1);
     expect(set[0].payload.muted).toBe(true);
     expect(set[0].payload.minutes).toBe(60);
+  });
+
+  test('with the master switch off, the mute button reads Unmute and unmutes', async ({ page }) => {
+    await open(page);
+    await page.click('#masterSwitchHost [role="switch"]');
+    await expect(page.locator('#masterLabel')).toHaveText('Sounds off');
+    // No timer is running, but the button must still say what its click does.
+    await expect(page.locator('#mutedUntil')).toBeHidden();
+    await expect(page.locator('#muteBtn')).toHaveText('Unmute');
+
+    await page.click('#muteBtn');
+    await expect(page.locator('#masterLabel')).toHaveText('Sounds on');
+    await expect(page.locator('#muteBtn')).toHaveText('Mute 1 hour');
+
+    const set = (await calls(page)).filter(c => c.type === 'setMute');
+    expect(set).toHaveLength(2);
+    expect(set[1].payload.muted).toBe(false);
   });
 
   test('the master switch is present on every page', async ({ page }) => {
