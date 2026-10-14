@@ -55,6 +55,8 @@
   var panelState = null;
   var els = {};
   var muteRecheckTimer = 0;
+  var loadFailed = false;
+  var LOAD_ATTEMPTS = 3;
 
   /* ----- Bridge ----- */
 
@@ -83,7 +85,7 @@
           window.__noizesLastResult = { id: id, timedOut: true }; // evidence trail
           resolve({ id: id, ok: false, error: "The app did not answer this request." });
         }
-      }, 5000);
+      }, window.__noizesRequestTimeoutMs || 5000); // test seam: tests shorten the wait
     });
   }
 
@@ -449,6 +451,12 @@
       els.page.appendChild(p);
       return;
     }
+    if (!state && loadFailed) {
+      /* Never a loading line forever: after the retries, say so and offer a way out. */
+      els.page.appendChild(buildLoadFailed());
+      pageNeedsRender = true;
+      return;
+    }
     if (!state) {
       /* Pages get a real state on their first render: the shell shows a
          loading line until the first push or reply arrives. */
@@ -476,6 +484,53 @@
       errEl.textContent = "This page failed to render. " + err.message;
       els.page.appendChild(errEl);
     }
+  }
+
+  function buildLoadFailed() {
+    var box = document.createElement("div");
+    box.className = "nz-load-failed";
+    box.setAttribute("data-testid", "load-failed");
+    var title = document.createElement("p");
+    title.className = "nz-load-failed-title";
+    title.textContent = "Noizes could not load your settings.";
+    var hint = document.createElement("p");
+    hint.className = "nz-load-failed-hint";
+    hint.textContent = "Try again. If it keeps happening, right-click the Noizes tray icon, choose Exit, then open Noizes again.";
+    var retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "nz-btn";
+    retry.id = "retryLoadBtn";
+    retry.textContent = "Try again";
+    retry.addEventListener("click", function () {
+      loadFailed = false;
+      renderActivePage();
+      loadState();
+    });
+    box.appendChild(title);
+    box.appendChild(hint);
+    box.appendChild(retry);
+    return box;
+  }
+
+  /* First load: a few tries, then a clear failure screen with Try again. A state
+     push that arrives at any point still wins and renders normally. */
+  function loadState(attempt) {
+    attempt = attempt || 1;
+    return api.getState().then(function (reply) {
+      if (state) return;
+      if (reply && reply.ok && reply.data) {
+        applyState(reply.data);
+        return;
+      }
+      window.__noizesLoadError = (reply && reply.error) || "no reply";
+      if (attempt < LOAD_ATTEMPTS) {
+        return new Promise(function (r) { window.setTimeout(r, 500); }).then(function () {
+          return loadState(attempt + 1);
+        });
+      }
+      loadFailed = true;
+      if (!state) renderActivePage();
+    });
   }
 
   /* ----- Navigation ----- */
@@ -556,13 +611,7 @@
 
     activate(pageFromHash());
 
-    api.getState().then(function (reply) {
-      if (reply && reply.ok && reply.data) {
-        applyState(reply.data);
-      } else if (reply && !reply.ok) {
-        NZ.toast(reply.error || "Could not load the settings.", "bad");
-      }
-    });
+    loadState();
   }
 
   /* When app.js runs as a defer script, the page modules after it in index.html

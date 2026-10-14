@@ -95,7 +95,50 @@ jobs:
         shell: pwsh
         run: choco install webview2-runtime -y --no-progress
 
+      # the exact single-file exe the installer ships
+      - name: Publish the shipping exe
+        run: dotnet publish src/Noizes/Noizes.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+
+      # the real settings window over the real bridge: settings load, a click saves,
+      # every page renders, no script errors, the window sits on screen
+      - name: Smoke test the settings window
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $p = Start-Process -FilePath "publish/Noizes.exe" -ArgumentList "--smoke-test" -Wait -PassThru -RedirectStandardOutput "smoke-stdout.log" -RedirectStandardError "smoke-stderr.log"
+          if (Test-Path "smoke-stdout.log") { Get-Content "smoke-stdout.log" }
+          if (Test-Path "smoke-stderr.log") { Get-Content "smoke-stderr.log" }
+          exit $p.ExitCode
+
+      # opens Noizes the way a person does: first open, reopen from the tray,
+      # sign-in start, and saved window spots that are off screen or too big
+      - name: Launch test
+        # run even when an earlier check failed, so one run shows every problem
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 10
+        run: ./scripts/launch-test.ps1 -Exe publish/Noizes.exe
+
+      - name: Build the installer
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=1.3.0-ci installer/noizes.iss
+
+      # upgrade over real older releases while they run in the tray: every setting
+      # must survive and the window must open with settings loaded
+      - name: Install and upgrade test
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/install-test.ps1 -NewInstaller installer/Output/Noizes-1.3.0-ci-setup.exe
+
       - name: Capture settings screenshots
+        # run even when an earlier check failed, so one run shows every problem
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--screenshot-settings", "docs/screenshots/v1.3/windows" -Wait -PassThru -RedirectStandardOutput "shot-stdout.log" -RedirectStandardError "shot-stderr.log"

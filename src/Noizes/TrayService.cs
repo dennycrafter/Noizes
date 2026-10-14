@@ -27,8 +27,13 @@ public class TrayApplicationContext : ApplicationContext
     const string TooltipNormal = "Noizes - done sounds";
     const string TooltipMuted = "Noizes (muted)";
 
-    public TrayApplicationContext(bool startWithUi)
+    readonly Control _uiThread; // marshals the second-launch signal onto the UI thread
+    RegisteredWaitHandle _showWait;
+
+    public TrayApplicationContext(bool startWithUi, EventWaitHandle showSignal = null)
     {
+        _uiThread = new Control();
+        _ = _uiThread.Handle; // create the handle now so BeginInvoke works from any thread
         var menu = new ContextMenuStrip();
 
         _miMute = new ToolStripMenuItem("Mute sounds");
@@ -93,7 +98,16 @@ public class TrayApplicationContext : ApplicationContext
 
         RefreshMuteUi();
 
-        if (startWithUi) SettingsWindow.Show();
+        // a second launch of Noizes (Start menu, shortcut) opens the settings window here
+        if (showSignal != null)
+            _showWait = ThreadPool.RegisterWaitForSingleObject(showSignal, (_, _) =>
+            {
+                try { _uiThread.BeginInvoke(new Action(SettingsWindow.Show)); }
+                catch (Exception ex) { Logger.Info("show signal failed: " + ex.Message); }
+            }, null, Timeout.Infinite, false);
+
+        // open once the message loop runs, so the window can take focus properly
+        if (startWithUi) _uiThread.BeginInvoke(new Action(SettingsWindow.Show));
     }
 
     /// <summary>True while either mute source is active: the indefinite switch or a timed mute.</summary>
@@ -166,6 +180,7 @@ public class TrayApplicationContext : ApplicationContext
     {
         try
         {
+            _showWait?.Unregister(null);
             _muteClock.Stop();
             _muteClock.Dispose();
             if (_mutedIcon != null)

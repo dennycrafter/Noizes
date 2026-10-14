@@ -34,6 +34,26 @@ jobs:
       - name: Publish self-contained exe
         run: dotnet publish src/Noizes/Noizes.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 
+      # release gate: the shipping exe must pass the same real-window checks as CI,
+      # or no installer is built and nothing is published
+      - name: Install the WebView2 runtime
+        shell: pwsh
+        run: choco install webview2-runtime -y --no-progress
+
+      - name: Smoke test the settings window
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $p = Start-Process -FilePath "publish/Noizes.exe" -ArgumentList "--smoke-test" -Wait -PassThru -RedirectStandardOutput "smoke-stdout.log" -RedirectStandardError "smoke-stderr.log"
+          if (Test-Path "smoke-stdout.log") { Get-Content "smoke-stdout.log" }
+          if (Test-Path "smoke-stderr.log") { Get-Content "smoke-stderr.log" }
+          exit $p.ExitCode
+
+      - name: Launch test
+        shell: pwsh
+        timeout-minutes: 10
+        run: ./scripts/launch-test.ps1 -Exe publish/Noizes.exe
+
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
@@ -62,6 +82,14 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAPP_VERSION=${{ steps.ver.outputs.version }} installer/noizes.iss'
+
+      # release gate: upgrading over older releases keeps every setting and opens the window
+      - name: Install and upgrade test
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/install-test.ps1 -NewInstaller "installer/Output/Noizes-${{ steps.ver.outputs.version }}-setup.exe"
 
       - name: Create release
         uses: softprops/action-gh-release@v2

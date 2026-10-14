@@ -13,9 +13,9 @@
 (function () {
   "use strict";
 
-  // evidence runs navigate with ?demo=1: the capture host's WebView2 drops
-  // page-to-host messages (proven in the CI logs), so the demo bridge renders
-  // the real page with the clearly labelled demo dataset instead
+  // ?demo=1 forces the demo data in a plain browser. The app itself never uses it:
+  // its windows always talk to the real bridge (the old "WebView2 drops messages"
+  // note was the host reading object messages wrong, fixed in UiBridge.DecodeWebMessage)
   var demoMode = /demo=1/.test(location.search);
   if (!demoMode && window.chrome && window.chrome.webview) return;
 

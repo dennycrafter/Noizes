@@ -797,6 +797,67 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("envelope-shape", false, ex.Message); }
 
+        // 14. page messages reach the bridge whatever form WebView2 hands them over in. The page
+        // posts objects; reading them with TryGetWebMessageAsString threw and lost every request,
+        // which left the window at "Loading settings." in v1.3.0-beta.2.
+        try
+        {
+            const string asObject = "{\"id\":1,\"type\":\"getState\"}";
+            const string asString = "\"{\\\"id\\\":1,\\\"type\\\":\\\"getState\\\"}\"";
+            Check("message-object-read", UiBridge.DecodeWebMessage(asObject) == asObject, asObject);
+            var unwrapped = UiBridge.DecodeWebMessage(asString);
+            Check("message-string-read", unwrapped == asObject, "got " + (unwrapped ?? "null"));
+            Check("message-empty-ignored", UiBridge.DecodeWebMessage("") == null && UiBridge.DecodeWebMessage("\"not json") == null);
+
+            // the whole path: an object message as WebView2 delivers it gets a getState reply
+            var posted = new List<string>();
+            Action<string> probe = posted.Add;
+            UiBridge.Attach(probe);
+            try { UiBridge.HandleMessage(UiBridge.DecodeWebMessage("{\"id\":41,\"type\":\"getState\"}")); }
+            finally { UiBridge.Detach(probe); }
+            Check("message-object-answered", posted.Any(l => l.Contains("\"id\":41") && l.Contains("\"ok\":true")),
+                posted.Count + " replies");
+        }
+        catch (Exception ex) { Check("message-object-read", false, ex.Message); }
+
+        // 15. the settings window always opens fully on a screen
+        try
+        {
+            var main = new System.Drawing.Rectangle(0, 0, 1920, 1040);   // 1080p minus the taskbar
+            var left = new System.Drawing.Rectangle(-1920, 0, 1920, 1040); // a second monitor on the left
+            var small = new System.Drawing.Rectangle(0, 0, 1366, 728);
+            var def = new System.Drawing.Size(1080, 720);
+            bool Inside(System.Drawing.Rectangle r, System.Drawing.Rectangle a) => a.Contains(r);
+
+            var fresh = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(-1, -1, 1080, 720), new[] { main }, main, def);
+            Check("place-first-run-centered", Inside(fresh, main) && fresh.X == 420 && fresh.Y == 160, fresh.ToString());
+
+            var kept = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(200, 100, 1000, 700), new[] { main }, main, def);
+            Check("place-saved-kept", kept == new System.Drawing.Rectangle(200, 100, 1000, 700), kept.ToString());
+
+            var gone = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(-1700, 50, 1080, 720), new[] { main }, main, def);
+            Check("place-monitor-unplugged", Inside(gone, main), gone.ToString());
+
+            var other = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(-1700, 50, 1080, 720), new[] { main, left }, main, def);
+            Check("place-second-monitor-kept", other.X == -1700 && other.Y == 50, other.ToString());
+
+            var far = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(-32000, -32000, 1080, 720), new[] { main }, main, def);
+            Check("place-far-off-screen", Inside(far, main), far.ToString());
+
+            var edge = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(1500, 600, 1080, 720), new[] { main }, main, def);
+            Check("place-hanging-off-edge", Inside(edge, main), edge.ToString());
+
+            var huge = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(0, 0, 4000, 3000), new[] { small }, small, def);
+            Check("place-bigger-than-screen", Inside(huge, small), huge.ToString());
+
+            var junk = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(5, 5, 0, 0), new[] { main }, main, def);
+            Check("place-junk-size", Inside(junk, main) && junk.Width == 1080, junk.ToString());
+
+            var none = SettingsWindow.PlaceWindow(new System.Drawing.Rectangle(-1, -1, 1080, 720), Array.Empty<System.Drawing.Rectangle>(), System.Drawing.Rectangle.Empty, def);
+            Check("place-no-screen-info", none.Width > 0 && none.Height > 0, none.ToString());
+        }
+        catch (Exception ex) { Check("place-first-run-centered", false, ex.Message); }
+
         // 9. windows CI only: the settings form must construct headless - no Show(), so no
         // window handles (MessageBox lives only in click handlers, never in the ctor).
         // Its own method: the Linux harness never calls it, so the WinForms type graph

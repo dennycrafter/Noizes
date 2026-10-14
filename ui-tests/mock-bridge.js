@@ -72,6 +72,8 @@
 
   var state = null;
   var calls = [];
+  // set window.__noizesMockSilence = ['getState'] in an init script to start silent
+  var silenced = (window.__noizesMockSilence || []).slice();
   var seq = 0;
 
   function freshState() {
@@ -272,6 +274,8 @@
       var payload = {};
       for (var k in msg) if (k !== 'type' && k !== 'id') payload[k] = msg[k];
       calls.push({ type: type, payload: payload });
+      // test seam: a silenced type gets no reply at all, like a host that never answers
+      if (silenced.indexOf(type) !== -1) return;
       var handler = handlers[type];
       if (!handler) { replyError(msg.id, 'unknown message type: ' + type); return; }
       handler(payload, msg.id);
@@ -294,7 +298,8 @@
       pushState();
     },
     pushState: pushState,
-    get state() { return state; }
+    get state() { return state; },
+    set silence(types) { silenced = (types || []).slice(); }
   };
 
   state = freshState();

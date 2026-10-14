@@ -66,6 +66,23 @@ public static class UiBridge
 
     // ---------------------------------------------------------------- messages in
 
+    /// <summary>Turns what WebView2 hands the host (CoreWebView2WebMessageReceivedEventArgs.WebMessageAsJson)
+    /// into the JSON text HandleMessage reads. The page posts plain objects, so the JSON is the message
+    /// itself. A page that posts a JSON string arrives as a quoted string literal and is unwrapped once.
+    /// Never use TryGetWebMessageAsString here: it throws for object messages, which is how every page
+    /// request was silently lost and the window sat at "Loading settings." in v1.3.0-beta.</summary>
+    public static string DecodeWebMessage(string webMessageAsJson)
+    {
+        if (string.IsNullOrWhiteSpace(webMessageAsJson)) return null;
+        var t = webMessageAsJson.TrimStart();
+        if (t.StartsWith('"'))
+        {
+            try { return JsonSerializer.Deserialize<string>(t); }
+            catch (JsonException) { return null; }
+        }
+        return webMessageAsJson;
+    }
+
     /// <summary>One message from the page. Must run on the UI thread; see the class comment.</summary>
     public static void HandleMessage(string json)
     {
@@ -108,6 +125,7 @@ public static class UiBridge
         {
             case "getState":
                 PostReply(rawId, BuildState());
+                Logger.Info("bridge: getState answered"); // the launch test reads this line
                 break;
 
             case "setEvent": SetEvent(msg, rawId); break;
