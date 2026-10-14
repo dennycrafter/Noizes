@@ -24,7 +24,8 @@ public static class WindowsStartup
         {
             using var k = Registry.CurrentUser.CreateSubKey(RunKey);
             if (on)
-                k.SetValue(ValueName, $"\"{Application.ExecutablePath}\"");
+                // --background: a sign-in start stays in the tray instead of opening settings
+                k.SetValue(ValueName, $"\"{Application.ExecutablePath}\" --background");
             else
                 k.DeleteValue(ValueName, false);
         }

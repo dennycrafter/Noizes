@@ -46,3 +46,42 @@ test.describe('boot and state contract', () => {
     await expect(page.locator('#masterSwitchHost [role="switch"]')).toHaveAttribute('aria-checked', 'false');
   });
 });
+
+test.describe('first load never hangs', () => {
+  const path = require('path');
+  const MOCK = path.join(__dirname, '..', 'mock-bridge.js');
+
+  async function openSilent(page) {
+    await page.addInitScript(() => {
+      window.__noizesMockSilence = ['getState'];
+      window.__noizesRequestTimeoutMs = 400;
+    });
+    await page.addInitScript({ path: MOCK });
+    await page.goto('/', { waitUntil: 'load' });
+  }
+
+  test('a host that never answers shows Try again instead of loading forever', async ({ page }) => {
+    await openSilent(page);
+    await expect(page.getByTestId('load-failed')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#page')).not.toContainText('Loading settings');
+    // it tried more than once before giving up
+    const tries = await page.evaluate(() => window.__noizesMock.calls.filter(c => c.type === 'getState').length);
+    expect(tries).toBe(3);
+  });
+
+  test('Try again loads the settings once the host answers', async ({ page }) => {
+    await openSilent(page);
+    await expect(page.getByTestId('load-failed')).toBeVisible({ timeout: 10000 });
+    await page.evaluate(() => { window.__noizesMock.silence = []; });
+    await page.click('#retryLoadBtn');
+    await expect(page.locator('.snd-row').first()).toBeVisible();
+    await expect(page.getByTestId('load-failed')).toHaveCount(0);
+  });
+
+  test('a late state push still renders the page', async ({ page }) => {
+    await openSilent(page);
+    await expect(page.locator('#page')).toContainText('Loading settings'); // the page is listening
+    await page.evaluate(() => window.__noizesMock.pushState());
+    await expect(page.locator('.snd-row').first()).toBeVisible();
+  });
+});

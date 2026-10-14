@@ -167,6 +167,10 @@ button { cursor: pointer; }
 
 .nz-page-error { color: var(--bad); }
 
+.nz-load-failed { max-width: 520px; }
+.nz-load-failed-title { margin: 0 0 8px; font-weight: 600; }
+.nz-load-failed-hint { margin: 0 0 16px; color: var(--muted); }
+
 /* Cards (group boxes) and rows. */
 
 .nz-card {

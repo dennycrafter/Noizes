@@ -73,6 +73,12 @@
           navigate: function (page) { location.hash = '#' + page; }
         };
         nzDestroy = render(container, bridge);
+        // paint from the state the shell already holds; the page's own getState only refreshes it.
+        // Deferred: render can run while this file is still loading, before its tables exist.
+        var initialPush = nzPush;
+        if (ctx.state && initialPush) {
+          setTimeout(function () { if (nzPush === initialPush) initialPush(ctx.state); }, 0);
+        }
         return function () {
           if (nzDestroy) { nzDestroy(); nzDestroy = null; }
           nzPush = null;
