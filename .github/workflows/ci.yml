@@ -113,11 +113,15 @@ jobs:
       # opens Noizes the way a person does: first open, reopen from the tray,
       # sign-in start, and saved window spots that are off screen or too big
       - name: Launch test
+        # run even when an earlier check failed, so one run shows every problem
+        if: ${{ !cancelled() }}
         shell: pwsh
         timeout-minutes: 10
         run: ./scripts/launch-test.ps1 -Exe publish/Noizes.exe
 
       - name: Capture settings screenshots
+        # run even when an earlier check failed, so one run shows every problem
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           $p = Start-Process -FilePath "src/Noizes/bin/Release/net8.0-windows/Noizes.exe" -ArgumentList "--screenshot-settings", "docs/screenshots/v1.3/windows" -Wait -PassThru -RedirectStandardOutput "shot-stdout.log" -RedirectStandardError "shot-stderr.log"
