@@ -31,6 +31,13 @@ public class ClaudeDesktopWatcher
 
     const string RenameSuffix = ", rename session";
 
+    // a brand-new chat carries one of these until Claude names it, which happens right as the
+    // first reply finishes (seen on Denis's PC: "New chat" became "Tweet to Claude skill")
+    static readonly string[] PlaceholderNames = { "New chat", "New task", "New conversation", "Untitled", "" };
+
+    static bool IsPlaceholder(string chat) =>
+        chat != null && PlaceholderNames.Any(p => string.Equals(p, chat.Trim(), StringComparison.OrdinalIgnoreCase));
+
     public void Start()
     {
         if (_running) return; // start/stop may be called repeatedly as the feature flag changes
@@ -88,13 +95,17 @@ public class ClaudeDesktopWatcher
 
     /// <summary>What one look at the window means. Pure, so the self-test covers every case.
     /// A finish needs the Stop button gone while the same chat is still open; a different chat
-    /// on screen means the user switched away, which is not a finish. An app version without
-    /// the rename button reports no chat at all (null), and then the old Stop-only rule applies.</summary>
+    /// on screen means the user switched away, which is not a finish. A new chat that just got
+    /// its real name ("New chat" to a title) is the same chat, renamed as its first reply ended,
+    /// so that is a finish too. An app version without the rename button reports no chat at all
+    /// (null), and then the old Stop-only rule applies.</summary>
     public static Step Decide(bool stopSeen, string stopChat, bool stopNow, string chatNow)
     {
         if (stopNow) return Step.Working;
         if (!stopSeen) return Step.Idle;
-        return string.Equals(stopChat, chatNow, StringComparison.Ordinal) ? Step.Finished : Step.SwitchedAway;
+        if (string.Equals(stopChat, chatNow, StringComparison.Ordinal)) return Step.Finished;
+        if (IsPlaceholder(stopChat) && chatNow != null) return Step.Finished; // named on finish
+        return Step.SwitchedAway;
     }
 
     public readonly record struct WindowRead(bool StopVisible, string Chat);
