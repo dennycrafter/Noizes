@@ -889,6 +889,15 @@ public static class SelfTest
                 ClaudeDesktopWatcher.Decide(true, chat, true, chat) == ClaudeDesktopWatcher.Step.Working, "Stop still there");
             Check("watch-idle",
                 ClaudeDesktopWatcher.Decide(false, null, false, chat) == ClaudeDesktopWatcher.Step.Idle, "nothing running");
+            Check("watch-new-chat-named-dings",
+                ClaudeDesktopWatcher.Decide(true, "New chat", false, "Tweet to Claude skill") == ClaudeDesktopWatcher.Step.Finished,
+                "a new chat renamed as its first reply ends is a finish (missed in v1.3.0, seen on Denis's PC)");
+            Check("watch-new-chat-window-gone-no-ding",
+                ClaudeDesktopWatcher.Decide(true, "New chat", false, null) == ClaudeDesktopWatcher.Step.SwitchedAway,
+                "a new chat whose window closed mid-reply: no ding");
+            Check("watch-named-chat-switch-still-quiet",
+                ClaudeDesktopWatcher.Decide(true, "Tweet to Claude skill", false, "New chat") == ClaudeDesktopWatcher.Step.SwitchedAway,
+                "leaving a named chat for a new one: no ding");
             Check("watch-old-app-still-dings",
                 ClaudeDesktopWatcher.Decide(true, null, false, null) == ClaudeDesktopWatcher.Step.Finished,
                 "an app without chat names keeps the old Stop-only behavior");
