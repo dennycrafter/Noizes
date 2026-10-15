@@ -858,6 +858,43 @@ public static class SelfTest
         }
         catch (Exception ex) { Check("place-first-run-centered", false, ex.Message); }
 
+        // 16. Claude desktop watcher: a ding only when Claude finishes in the chat that is open.
+        // Button names below are the real ones captured from the Claude app on 14 Oct 2026.
+        try
+        {
+            var working = ClaudeDesktopWatcher.ReadWindow(new[] {
+                "Activity panel", "Stop response", "Noizes repo fixes and PR, rename session", "Send message" });
+            Check("watch-read-working", working.StopVisible && working.Chat == "Noizes repo fixes and PR",
+                $"stop={working.StopVisible} chat={working.Chat}");
+            var idle = ClaudeDesktopWatcher.ReadWindow(new[] {
+                "Send message", "Use voice mode", "Noizes repo fixes and PR, rename session", "Ran 3 commands" });
+            Check("watch-read-idle", !idle.StopVisible && idle.Chat == "Noizes repo fixes and PR",
+                $"stop={idle.StopVisible} chat={idle.Chat}");
+            var other = ClaudeDesktopWatcher.ReadWindow(new[] { "Chrome bookmarks review, rename session", "Send message" });
+            Check("watch-read-other-chat", !other.StopVisible && other.Chat == "Chrome bookmarks review", $"chat={other.Chat}");
+            var legacy = ClaudeDesktopWatcher.ReadWindow(new[] { "Stop" });
+            Check("watch-read-old-app", legacy.StopVisible && legacy.Chat == null, $"chat={legacy.Chat ?? "none"}");
+
+            const string chat = "Noizes repo fixes and PR";
+            Check("watch-finish-same-chat",
+                ClaudeDesktopWatcher.Decide(true, chat, false, chat) == ClaudeDesktopWatcher.Step.Finished,
+                "Stop gone, same chat open: ding");
+            Check("watch-switch-no-ding",
+                ClaudeDesktopWatcher.Decide(true, chat, false, "Chrome bookmarks review") == ClaudeDesktopWatcher.Step.SwitchedAway,
+                "Stop gone because another chat was opened: no ding (the beta.3 early ding)");
+            Check("watch-window-gone-no-ding",
+                ClaudeDesktopWatcher.Decide(true, chat, false, null) == ClaudeDesktopWatcher.Step.SwitchedAway,
+                "Claude window closed or unreadable mid-reply: no ding");
+            Check("watch-still-working",
+                ClaudeDesktopWatcher.Decide(true, chat, true, chat) == ClaudeDesktopWatcher.Step.Working, "Stop still there");
+            Check("watch-idle",
+                ClaudeDesktopWatcher.Decide(false, null, false, chat) == ClaudeDesktopWatcher.Step.Idle, "nothing running");
+            Check("watch-old-app-still-dings",
+                ClaudeDesktopWatcher.Decide(true, null, false, null) == ClaudeDesktopWatcher.Step.Finished,
+                "an app without chat names keeps the old Stop-only behavior");
+        }
+        catch (Exception ex) { Check("watch-read-working", false, ex.Message); }
+
         // 9. windows CI only: the settings form must construct headless - no Show(), so no
         // window handles (MessageBox lives only in click handlers, never in the ctor).
         // Its own method: the Linux harness never calls it, so the WinForms type graph
